@@ -26,6 +26,9 @@ from . import laya_ref
 INPUT_NAMES = ["input_ids", "attention_mask", "marker_pos", "marker_mask", "qtype"]
 OUTPUT_NAMES = ["logits", "act_logits"]
 OPSET = int(os.environ.get("OLLAYA_OPSET", "20"))
+# "1": torch.onnx's optimizer (constant folding, then onnxscript's fusions for the opset);
+# "fold": the same constant folding and clean-up without the fusions; "0": the graph as translated.
+OPTIMIZE = os.environ.get("OLLAYA_ONNX_OPTIMIZE", "1")
 # DecisionModel.forward picks topk(2) vs a zero-padded topk(1) with a Python `if` on the marker
 # width, so the exported graph always takes topk(2). Runtimes pad the marker axis to at least this
 # many slots; a masked slot scores -1e4, so probabilities, entropy and k are unchanged.
@@ -66,6 +69,35 @@ def expand_attention_masks(model):
                 helper.make_node("Expand", [mask, p + "_target"], [p + "_full"]),
             ]
             node.input[3] = p + "_full"
+            added += 1
+        nodes.append(node)
+    del model.graph.node[:]
+    model.graph.node.extend(nodes)
+    return added
+
+
+def expand_rotary_caches(model):
+    """Give every opset-23 `RotaryEmbedding` node cos/sin caches with the batch dimension.
+
+    onnxscript's RotaryEmbedding fusion feeds caches shaped [1, S, D/2], computed once from the
+    position ids. Without `position_ids` the spec asks for [B, S, D/2], and ONNX Runtime 1.28's
+    kernel rejects a batch of 1 when B > 1. Expanding them is exact.
+    """
+    from onnx import helper
+
+    nodes, added = [], 0
+    for node in model.graph.node:
+        if node.op_type == "RotaryEmbedding" and (len(node.input) < 4 or not node.input[3]):
+            p = "%s_cache" % node.name
+            nodes += [
+                helper.make_node("Shape", [node.input[0]], [p + "_batch"], start=0, end=1),
+                helper.make_node("Constant", [], [p + "_ones"],
+                                 value=helper.make_tensor(p + "_ones_v", onnx.TensorProto.INT64, [2], [1, 1])),
+                helper.make_node("Concat", [p + "_batch", p + "_ones"], [p + "_target"], axis=0),
+                helper.make_node("Expand", [node.input[1], p + "_target"], [p + "_cos"]),
+                helper.make_node("Expand", [node.input[2], p + "_target"], [p + "_sin"]),
+            ]
+            node.input[1], node.input[2] = p + "_cos", p + "_sin"
             added += 1
         nodes.append(node)
     del model.graph.node[:]
@@ -118,16 +150,25 @@ def export(name: str, out_dir: str, root: str) -> str:
 
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, "model.onnx")
+    for stale in (path, path + ".data"):  # onnx appends external data to an existing file
+        if os.path.exists(stale):
+            os.remove(stale)
     with torch.no_grad():
         program = torch.onnx.export(
             graph, args, dynamo=True, opset_version=OPSET,
             input_names=INPUT_NAMES, output_names=OUTPUT_NAMES,
-            dynamic_shapes=dynamic_shapes, optimize=os.environ.get("OLLAYA_ONNX_OPTIMIZE", "1") == "1",
+            dynamic_shapes=dynamic_shapes, optimize=OPTIMIZE == "1",
         )
+    if OPTIMIZE == "fold":
+        import onnxscript.optimizer
+        onnxscript.optimizer.optimize_ir(program.model)
     program.save(path, external_data=False)
     if OPSET >= 23:
         model = onnx.load(path, load_external_data=True)
         expand_attention_masks(model)
+        expand_rotary_caches(model)
+        if os.path.exists(path + ".data"):  # large graphs were saved with external data already
+            os.remove(path + ".data")
         onnx.save(model, path, save_as_external_data=True, location="model.onnx.data")
     onnx.checker.check_model(path, full_check=True)
 
