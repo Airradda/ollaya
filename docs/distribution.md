@@ -157,10 +157,10 @@ sha256 (llama.cpp v0.5.0, build b11146):
 | | Requirement | Why |
 |---|---|---|
 | Linux | glibc 2.38 or newer: Ubuntu 24.04, Debian 13, Fedora 39, RHEL 10 or newer | pyke's `libonnxruntime.a` references `__isoc23_strtol` and related symbols (`GLIBC_2.38`) and `GLIBCXX_3.4.31`. The provider `.so` needs glibc 2.38 too. `install.sh` checks this. Older hosts can use the Docker image. |
-| Linux, GPU | NVIDIA driver R580 or newer (CUDA 13) on x86-64 | Uses pyke's CUDA 13 build. The driver's CUDA major version must be at least 13; minor-version compatibility covers the 13.4 runtime. |
+| Linux, GPU | NVIDIA driver R580 or newer (CUDA 13) on x86-64 | The GPU pack runs Microsoft's ONNX Runtime 1.28.2 CUDA 13 build (Turing to Blackwell, sm_75 to sm_120; ADR 0004). The driver's CUDA major version must be at least 13; minor-version compatibility covers the 13.4 runtime. |
 | WSL 2 | Windows NVIDIA driver with CUDA 13 | The driver's `libcuda.so.1` comes from `/usr/lib/wsl/lib`. Never install a Linux driver inside WSL. |
 | Windows | 10 or 11 on x64 | pyke's Windows build. `ollaya.exe` imports the Microsoft Visual C++ runtime (`VCRUNTIME140.dll`, `MSVCP140.dll`), as the CUDA provider does. |
-| Windows, GPU | NVIDIA driver R580 or newer (CUDA 13) | pyke's Windows CUDA 13 build, with the same minor-version compatibility as on Linux. `install.ps1` reads the driver from `nvidia-smi`, or from WMI. |
+| Windows, GPU | NVIDIA driver R580 or newer (CUDA 13) | Microsoft's ONNX Runtime 1.28.2 CUDA 13 build, as on Linux, with the same minor-version compatibility. `install.ps1` reads the driver from `nvidia-smi`, or from WMI. |
 | macOS | 14 or newer on Apple silicon | The MLX engine needs macOS 14; the release workflow builds darwin-arm64 with `MACOSX_DEPLOYMENT_TARGET=14.0` and prints it with `vtool -show-build`. |
 | musl (Alpine) | not supported | glibc build. Use the Docker image. |
 
