@@ -7,9 +7,11 @@
 # Archives, written to --out (default: ./dist):
 #   ollaya-<platform>.tar.zst        bin/ollaya + lib/ollaya/llama/ (llama.cpp's libraries: CPU, and Metal
 #                                    on macOS) + share/doc/ollaya/ (LICENSE, THIRD_PARTY_NOTICES)
-#   ollaya-linux-amd64-cuda.tar.zst  lib/ollaya/cuda_v13/ (ORT CUDA provider + NVIDIA CUDA/cuDNN
-#                                    libraries + libggml-cuda.so, llama.cpp's CUDA backend) +
-#                                    share/doc/ollaya/cuda_v13/ (notices, NVIDIA licenses)
+#                                    and on x86-64 Linux and Windows lib/ollaya/ollaya-cuda-runner
+#                                    (the GPU runner, see OLLAYA_CUDA_RUNNER)
+#   ollaya-linux-amd64-cuda.tar.zst  lib/ollaya/cuda_v13/ (Microsoft's ONNX Runtime CUDA build +
+#                                    NVIDIA CUDA/cuDNN libraries + libggml-cuda.so, llama.cpp's
+#                                    CUDA backend) + share/doc/ollaya/cuda_v13/ (notices, licenses)
 #   ollaya-darwin-arm64.tgz          same content as the darwin .tar.zst; stock macOS has no zstd
 #   ollaya-darwin-arm64-mlx.tar.zst  lib/ollaya/mlx_metal/ (mlx.metallib, the MLX engine's Metal
 #                                    kernels) + share/doc/ollaya/mlx_metal/ (notices); also .tgz
@@ -23,9 +25,9 @@
 #
 # Options:
 #   --platform P  linux-amd64 | linux-arm64 | darwin-arm64 | windows-amd64 (default: this host)
-#   --cuda        also build the CUDA archive (linux-amd64 and windows-amd64). The binary must
-#                 have been built with `--features ollaya-runner/cuda`, which also puts the ORT
-#                 provider libraries in <target-dir>.
+#   --cuda        also build the CUDA archive (linux-amd64 and windows-amd64), with Microsoft's
+#                 ONNX Runtime GPU release (docs/decisions/0004-cuda-onnxruntime-builds.md). Its
+#                 runner is the base archive's lib/ollaya/ollaya-cuda-runner.
 #   --mlx         also build the MLX archive (darwin-arm64 only). The binary must have been built
 #                 with `--features ollaya-runner/mlx`, whose build script puts mlx.metallib in
 #                 <target-dir> (docs/decisions/0001-mlx-engine.md).
@@ -37,6 +39,10 @@
 #
 # Environment:
 #   OLLAYA_BIN             binary to package (default: <target-dir>/ollaya)
+#   OLLAYA_CUDA_RUNNER     ollaya built with `--features ollaya-runner/cuda-dynamic`; the base
+#                          archive ships it as lib/ollaya/ollaya-cuda-runner, which GPU runners
+#                          start from (required for the base archive of linux-amd64 and
+#                          windows-amd64)
 #   OLLAYA_CARGO_PACKAGE   package whose dependency tree is listed in the notices (default: ollaya)
 #   OLLAYA_CARGO_FEATURES  cargo features of the build (default: ollaya-runner/cuda on linux-amd64
 #                          and windows-amd64, ollaya-runner/coreml on darwin-arm64, plus
@@ -55,6 +61,12 @@ ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 ORT_VERSION=1.28.0
 ORT_LICENSE_SHA256=2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c
 ORT_NOTICES_SHA256=0e07b95f3a8d6230037707c5c4a2b554d12c4cb67369669ac255635528ffcee2
+# The CUDA pack runs Microsoft's ONNX Runtime GPU release instead, unmodified: pyke's CUDA build
+# has no kernels for sm_120 (docs/decisions/0004-cuda-onnxruntime-builds.md). Same minor version
+# as ORT_VERSION; bump together.
+ORT_GPU_VERSION=1.28.2
+ORT_GPU_LINUX_SHA256=118ca8dbc4e4bb9b3b7fea137d796a89d957c9aa70e1dc3a5199a302cdd5bb32
+ORT_GPU_WINDOWS_SHA256=4b7a2d01a3cc96b12d06c8266af2c8f42c96365c4a0100d45fd874c71b4a2e19
 
 # MLX (docs/decisions/0001-mlx-engine.md): the pins in crates/ollaya-mlx-sys/build.rs, and the
 # notices of what the `mlx` feature links into bin/ollaya. MLX's ACKNOWLEDGMENTS.md carries the
@@ -188,12 +200,16 @@ case ",$FEATURES," in *mlx,*) LINKS_MLX=1 ;; *) LINKS_MLX=0 ;; esac
 EXE=
 [ "$PLATFORM" != windows-amd64 ] || EXE=.exe
 
-# The CUDA pack (lib/ollaya/cuda_v13): ORT's provider libraries, and the NVIDIA libraries kept from
+# The CUDA pack (lib/ollaya/cuda_v13): Microsoft's ONNX Runtime CUDA 13 build (the library and its
+# shared and CUDA providers), and the NVIDIA libraries kept from
 # the wheels in packaging/cuda-requirements.txt (see is_cuda_lib). Everything else in the wheels
 # (static and import libs, headers, cufftw, nvblas, nvrtc .alt builds) is dropped. The TensorRT
 # and NV TensorRT RTX providers are left out: they need TensorRT 10 (libnvinfer, nvinfer_10.dll),
 # which is not shipped, and the runner only registers the CUDA execution provider.
 if [ "$PLATFORM" = windows-amd64 ]; then
+    ORT_GPU_ARCHIVE=onnxruntime-win-x64-gpu_cuda13-$ORT_GPU_VERSION.zip
+    ORT_GPU_SHA256=$ORT_GPU_WINDOWS_SHA256
+    ORT_LIBRARY=onnxruntime.dll
     ORT_PROVIDERS="onnxruntime_providers_shared.dll onnxruntime_providers_cuda.dll"
     CUDA_LIBS_REQUIRED="cudart64_13.dll cublas64_13.dll cublasLt64_13.dll cufft64_12.dll curand64_10.dll
 nvrtc64_130_0.dll nvJitLink_130_0.dll cudnn64_9.dll cudnn_graph64_9.dll"
@@ -202,6 +218,9 @@ nvrtc64_130_0.dll nvJitLink_130_0.dll cudnn64_9.dll cudnn_graph64_9.dll"
     # Windows wheels keep their DLLs in nvidia/*/bin/, Linux wheels in nvidia/*/lib/.
     WHEEL_LIB_DIR=bin
 else
+    ORT_GPU_ARCHIVE=onnxruntime-linux-x64-gpu_cuda13-$ORT_GPU_VERSION.tgz
+    ORT_GPU_SHA256=$ORT_GPU_LINUX_SHA256
+    ORT_LIBRARY=libonnxruntime.so.1
     ORT_PROVIDERS="libonnxruntime_providers_shared.so libonnxruntime_providers_cuda.so"
     CUDA_LIBS_REQUIRED="libcudart.so.13 libcublas.so.13 libcublasLt.so.13 libcufft.so.12 libcurand.so.10
 libnvrtc.so.13 libnvJitLink.so.13 libcudnn.so.9 libcudnn_graph.so.9"
@@ -381,6 +400,18 @@ stage_base() {
     fi
     cp "$BIN" "$root/bin/ollaya$EXE"
     chmod 0755 "$root/bin/ollaya$EXE"
+    # The GPU runner: the same program, loading ONNX Runtime from the CUDA pack at run time. It is
+    # here rather than in the pack so the pack keeps its FILES.sha256 from release to release.
+    case $PLATFORM in
+        linux-amd64 | windows-amd64)
+            runner=${OLLAYA_CUDA_RUNNER:-}
+            [ -n "$runner" ] && [ -f "$runner" ] ||
+                die "set OLLAYA_CUDA_RUNNER to ollaya built with --features ollaya-runner/cuda-dynamic"
+            mkdir -p "$root/lib/ollaya"
+            cp "$runner" "$root/lib/ollaya/ollaya-cuda-runner$EXE"
+            chmod 0755 "$root/lib/ollaya/ollaya-cuda-runner$EXE"
+            ;;
+    esac
     # Windows: the DLLs ollaya.exe links (DirectML) sit next to it (copy-dylibs). ORT's provider
     # DLLs are loaded only on demand: the CUDA ones ship in the GPU pack, the others not at all.
     if [ -n "$EXE" ]; then
@@ -402,6 +433,10 @@ stage_base() {
         printf 'Ollaya %s (%s): third-party notices\n\n' "$VERSION" "$PLATFORM"
         printf 'Ollaya is licensed under the Apache License 2.0 (see LICENSE). bin/ollaya also\n'
         printf 'contains the third-party software below.\n\n'
+        if [ -f "$root/lib/ollaya/ollaya-cuda-runner$EXE" ]; then
+            printf 'lib/ollaya/ollaya-cuda-runner%s is the same program built to load ONNX Runtime from\n' "$EXE"
+            printf 'the CUDA pack instead of linking it; it contains the Rust crates listed below.\n\n'
+        fi
         printf '1. '
         ort_notice "Linked into bin/ollaya$EXE."
         printf '\n2. llama.cpp %s (MIT), in lib/ollaya/llama: see llama.cpp-THIRD_PARTY_NOTICES.\n' \
@@ -443,20 +478,18 @@ stage_cuda() {
     mkdir -p "$lib" "$doc/licenses"
     have unzip || die "missing tool: unzip"
 
-    for p in $ORT_PROVIDERS; do
-        [ -e "$TARGET_DIR/$p" ] ||
-            die "$TARGET_DIR/$p not found; build with --features ollaya-runner/cuda"
-        cp -L "$TARGET_DIR/$p" "$lib/$p"
+    # Microsoft's ONNX Runtime, byte for byte. The TensorRT provider in the archive is left out.
+    fetch "https://github.com/microsoft/onnxruntime/releases/download/v$ORT_GPU_VERSION/$ORT_GPU_ARCHIVE" \
+        "$CACHE/$ORT_GPU_ARCHIVE" "$ORT_GPU_SHA256"
+    case $ORT_GPU_ARCHIVE in
+        *.zip) unzip -q "$CACHE/$ORT_GPU_ARCHIVE" -d "$WORK" ;;
+        *) tar -xzf "$CACHE/$ORT_GPU_ARCHIVE" -C "$WORK" ;;
+    esac
+    ort=$WORK/${ORT_GPU_ARCHIVE%.*}
+    for p in $ORT_LIBRARY $ORT_PROVIDERS; do
+        [ -e "$ort/lib/$p" ] || die "$p not found in $ORT_GPU_ARCHIVE"
+        cp -L "$ort/lib/$p" "$lib/$p"
     done
-    # Windows: GPU runners start from a copy of ollaya.exe in this folder, so the DLLs it imports
-    # (DirectML.dll, the same file as in bin/) go here too. Otherwise the runner would pick up
-    # whatever version System32 has, and ollaya.exe imports DirectML by ordinal.
-    if [ -n "$EXE" ]; then
-        for dll in "$TARGET_DIR"/*.dll; do
-            case ${dll##*/} in onnxruntime_providers_*) continue ;; esac
-            [ ! -f "$dll" ] || cp -L "$dll" "$lib/"
-        done
-    fi
 
     wheels=$CACHE/wheels
     mkdir -p "$wheels"
@@ -515,17 +548,17 @@ stage_cuda() {
     ) >"$WORK/FILES.sha256"
     mv "$WORK/FILES.sha256" "$lib/FILES.sha256"
 
-    cp "$CACHE/onnxruntime-$ORT_VERSION/ThirdPartyNotices.txt" "$doc/onnxruntime-ThirdPartyNotices.txt"
+    cp "$ort/ThirdPartyNotices.txt" "$doc/onnxruntime-ThirdPartyNotices.txt"
     {
         printf 'Ollaya %s CUDA accelerator package (%s): third-party notices\n\n' "$VERSION" "$PLATFORM"
         printf 'Everything in lib/ollaya/cuda_v13 is third-party software. None of it is covered by\n'
         printf "Ollaya's Apache-2.0 license.\n\n"
-        printf '1. '
-        ort_notice "Execution provider libraries: $ORT_PROVIDERS."
-        if [ -f "$lib/DirectML.dll" ]; then
-            printf '\nDirectML.dll is Microsoft DirectML as it ships with that ONNX Runtime build, the\n'
-            printf 'same file as bin/DirectML.dll, for the runners that start from this folder.\n'
-        fi
+        printf '1. ONNX Runtime %s (https://github.com/microsoft/onnxruntime), Microsoft'"'"'s\n' \
+            "$ORT_GPU_VERSION"
+        printf '%s, unmodified: %s.\n' "$ORT_GPU_ARCHIVE" "$ORT_LIBRARY $ORT_PROVIDERS"
+        printf 'License: MIT. The components ONNX Runtime bundles are listed in\n'
+        printf 'onnxruntime-ThirdPartyNotices.txt next to this file.\n\n'
+        sed 's/^/    /' "$ort/LICENSE"
         cat <<'EOF'
 
 2. NVIDIA CUDA and cuDNN runtime libraries

@@ -101,6 +101,17 @@ jobs:
             export MACOSX_DEPLOYMENT_TARGET=14.0
           fi
           cargo build --release --locked -p ollaya ${FEATURES:+--features "$FEATURES"}
+      - name: Build the GPU runner
+        if: contains(matrix.package-args, '--cuda')
+        shell: bash
+        env:
+          OLLAYA_BUILD_VERSION: ${{ steps.version.outputs.version }}
+        # The same program, loading Microsoft's ONNX Runtime from the CUDA pack at run time
+        # (docs/decisions/0004-cuda-onnxruntime-builds.md). Its own target directory keeps
+        # target/release/ollaya the statically linked build.
+        run: |
+          cargo build --release --locked -p ollaya --features ollaya-runner/cuda-dynamic \
+            --target-dir target/cuda-dynamic
       - name: Smoke test
         run: target/release/ollaya --version
       - name: Minimum macOS version
@@ -115,6 +126,10 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           export OLLAYA_CARGO_FEATURES=$FEATURES
+          case $PLATFORM in
+            linux-amd64) export OLLAYA_CUDA_RUNNER=target/cuda-dynamic/release/ollaya ;;
+            windows-amd64) export OLLAYA_CUDA_RUNNER=target/cuda-dynamic/release/ollaya.exe ;;
+          esac
           # shellcheck disable=SC2086 # PACKAGE_ARGS is a list of flags
           scripts/package.sh --platform "$PLATFORM" $PACKAGE_ARGS target/release "$VERSION"
       - name: Smoke test the Windows archives

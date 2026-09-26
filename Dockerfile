@@ -25,7 +25,9 @@ ARG OLLAYA_BUILD_VERSION=0.0.0-dev
 WORKDIR /src
 COPY . .
 # One binary serves both images. On amd64 it is built with ORT's CUDA provider bridge, as in the
-# release tarball; it runs on the CPU unless the CUDA libraries are present.
+# release tarball; it runs on the CPU unless the CUDA libraries are present. amd64 also builds
+# the GPU runner, lib/ollaya/ollaya-cuda-runner, which loads Microsoft's ONNX Runtime from the
+# CUDA pack (docs/decisions/0004-cuda-onnxruntime-builds.md).
 RUN --mount=type=cache,id=ollaya-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,id=ollaya-ort-${TARGETARCH},target=/root/.cache/ort.pyke.io,sharing=locked \
     --mount=type=cache,id=ollaya-target-${TARGETARCH},target=/src/target,sharing=locked \
@@ -40,14 +42,18 @@ RUN --mount=type=cache,id=ollaya-cargo-registry,target=/usr/local/cargo/registry
     mkdir -p /out; \
     cp target/release/ollaya /out/; \
     if [ "${TARGETARCH}" = amd64 ]; then \
-        cp -L target/release/libonnxruntime_providers_shared.so \
-            target/release/libonnxruntime_providers_cuda.so /out/; \
+        OLLAYA_BUILD_VERSION="${OLLAYA_BUILD_VERSION}" \
+            cargo build --release --locked -p ollaya --features ollaya-runner/cuda-dynamic \
+            --target-dir target/cuda-dynamic; \
+        cp target/cuda-dynamic/release/ollaya /out/ollaya-cuda-runner; \
+        export OLLAYA_CUDA_RUNNER=/out/ollaya-cuda-runner; \
     fi; \
     OLLAYA_CARGO_FEATURES="$features" scripts/package.sh --platform "linux-${TARGETARCH}" \
         --stage /stage /out "${OLLAYA_BUILD_VERSION}"; \
     mv "/stage/ollaya-linux-${TARGETARCH}" /stage/base
 
-# NVIDIA CUDA and cuDNN libraries from NVIDIA's wheels, exactly as in the -cuda tarball.
+# Microsoft's ONNX Runtime CUDA build and the NVIDIA CUDA and cuDNN libraries from NVIDIA's
+# wheels, exactly as in the -cuda tarball.
 FROM build AS build-cuda
 ARG OLLAYA_BUILD_VERSION=0.0.0-dev
 COPY --from=uv /uv /uvx /usr/local/bin/
