@@ -14,6 +14,7 @@ Outputs:
 """
 import argparse
 import json
+import math
 import os
 import shutil
 
@@ -105,6 +106,42 @@ def expand_rotary_caches(model):
     return added
 
 
+def prescale_attention(model):
+    """Scale q and k by sqrt(scale) before every opset-23 `Attention` node, which then uses scale 1.
+
+    This is how torch's opset-20 export writes scaled dot-product attention, and so how the shipped
+    graphs round. Laya is sensitive to that rounding on a few questions: with the scale inside
+    the node, `preset/guard/email_dict` `jailbreak` moved 2.5e-4 in probability on Apple silicon
+    CPU and failed parity (#6). With q and k pre-scaled, that question gives the opset-20 graph's
+    logits to 7 digits on x86 (ORT basic optimizations), and the fused graph passes parity on x86
+    and Apple silicon CPUs.
+    """
+    from onnx import helper
+
+    nodes, added = [], 0
+    for node in model.graph.node:
+        if node.op_type == "Attention":
+            given = [helper.get_attribute_value(a) for a in node.attribute if a.name == "scale"]
+            # Without a scale attribute the spec uses 1/sqrt(head size); every Laya node has 64.
+            root = math.sqrt(given[0] if given else 1 / 8.0)
+            p = "%s_prescale" % node.name
+            nodes += [
+                helper.make_node("Constant", [], [p + "_root"],
+                                 value=helper.make_tensor(p + "_root_v", onnx.TensorProto.FLOAT, [], [root])),
+                helper.make_node("Mul", [node.input[0], p + "_root"], [p + "_q"]),
+                helper.make_node("Mul", [node.input[1], p + "_root"], [p + "_k"]),
+            ]
+            node.input[0], node.input[1] = p + "_q", p + "_k"
+            for a in [a for a in node.attribute if a.name == "scale"]:
+                node.attribute.remove(a)
+            node.attribute.append(helper.make_attribute("scale", 1.0))
+            added += 1
+        nodes.append(node)
+    del model.graph.node[:]
+    model.graph.node.extend(nodes)
+    return added
+
+
 class Graph(torch.nn.Module):
     """DecisionModel.forward with a stable, export-friendly signature."""
 
@@ -167,6 +204,7 @@ def export(name: str, out_dir: str, root: str) -> str:
         model = onnx.load(path, load_external_data=True)
         expand_attention_masks(model)
         expand_rotary_caches(model)
+        prescale_attention(model)
         if os.path.exists(path + ".data"):  # large graphs were saved with external data already
             os.remove(path + ".data")
         onnx.save(model, path, save_as_external_data=True, location="model.onnx.data")
