@@ -79,7 +79,7 @@ churn_risk        no                                    ████████
 | `laya:en` | English decision model (ModernBERT-large, 421M). The fastest: 8–10 ms for five questions on an RTX 4090 |
 | `laya:multilingual` | 100+ languages (mmBERT-base, 322M) |
 | `laya:typed-decisions` | Fine-tuned on the typed-decisions workflows |
-| `decider`, `decider:0.8b` | Mapika's Qwen3.5 decoders, 2B (the default) and 0.8B: 0.591 on typed-decisions for 2B |
+| `decider`, `decider:4b`, `decider:0.8b` | Mapika's Qwen3.5 decoders, 2B (the default), 4B and 0.8B: 0.680 on typed-decisions for 4B, 0.591 for 2B |
 | `kev`, `kev:4b`, `kev:9b` | Jared Palmer's Kev: a LoRA and a pointer head on Qwen3.5 (0.8B by default, 4B, 9B), calibrated. `kev:9b` scores 0.722 on typed-decisions, the most of the models not trained on it |
 | `decision` | Decision 1.0 Eos by the vLLM Semantic Router contributors: a fine-tuned Qwen3.5-0.8B with an endpoint head, 16k-token rows |
 | `qwen3guard` | Qwen3Guard-Gen-0.6B safety guard with built-in questions: safe, controversial or unsafe, and the category |

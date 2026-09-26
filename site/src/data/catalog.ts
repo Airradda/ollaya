@@ -90,13 +90,14 @@ const overlays: Record<string, ModelOverlay> = {
     stats: { tag: 'decider:2b', accuracy: 0.591, latencyMs: 190 },
     title: 'decider',
     description:
-      'Decoder decision models by Mapika on Qwen3.5: the answer is read from option-letter logits in one forward pass. decider:2b scores 0.591 on typed decisions.',
+      'Decoder decision models by Mapika on Qwen3.5: the answer is read from option-letter logits in one forward pass. decider:4b scores 0.680 on typed decisions, decider:2b 0.591.',
     publisher: { name: 'Mapika', url: 'https://huggingface.co/Mapika' },
     capabilities: ['decision', 'long-context'],
     keywords: ['decider', 'decision', 'qwen', 'llm', 'classification', 'typesafe', 'jev', 'system one'],
     rank: 2,
     tags: {
       latest: { summary: 'Same as decider:2b.' },
+      '4b': { summary: 'Qwen3.5-4B base (v2.1), 0.680 on typed decisions, one fitted temperature per answer type. Best on a GPU.' },
       '2b': { summary: 'Qwen3.5-2B base, 0.591 on typed decisions.' },
       '0.8b': { summary: 'Qwen3.5-0.8B base, 0.506 on typed decisions: smaller and faster.' },
     },

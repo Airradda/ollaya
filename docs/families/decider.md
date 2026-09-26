@@ -9,7 +9,7 @@ tokens. Upstream serves them on `POST /v1/systemone` in TypeSafe's wire format.
 |---|---|---|---|---|---|
 | `Mapika/decider-0.8b` (v1) | Qwen3.5-0.8B-Base | 0.75B | 1.5 GB BF16, 1 file | 1.03 | **converted, ONNX** |
 | `Mapika/decider-2b` (v10) | Qwen3.5-2B-Base | 1.9B | 3.6 GB BF16, 1 file | 1.30 | **converted, ONNX** |
-| `Mapika/decider-4b` (v1) | Qwen3.5-4B-Base | 4B | 8.4 GB BF16 | – | same exporter; not converted |
+| `Mapika/decider-4b` (v2.1) | Qwen3.5-4B-Base | 4.2B | 8.4 GB BF16, 1 file | per type: choice 1.110, noul 1.560, score 1.287 | **converted, ONNX** (weights stay BF16 in memory) |
 | `Mapika/decider-35b-a3b` (v1) | Qwen3.5-35B-A3B-Base (MoE) | 35B / 3B active | 65 GB BF16, 15 shards | 1.08 | not converted (see "Larger models") |
 
 ## Recommended engine: ONNX (single forward)
@@ -42,13 +42,23 @@ A decision is one prefill plus a 255-row matmul, with no generation, so option (
 | `decision.json`, `calibration.json` | derived, hosted by Ollaya |
 | license | Apache-2.0, stated in the model card. The repo has no LICENSE file; the Qwen3.5 base is Apache-2.0. |
 
-For `decider-2b` the source is `Mapika/decider-2b@9839cc9d908be16c5988c0d041034b5fdf82c7a2` with the same file
-names. Each export writes `files.json` with sizes and sha256 values.
+For `decider-2b` the source is `Mapika/decider-2b@9839cc9d908be16c5988c0d041034b5fdf82c7a2`, and for `decider-4b`
+`Mapika/decider-4b@eb5fbdfc9448473ec25e399882912863afbdb70e` (v2.1; `model.safetensors` 8.41 GB, sha256
+`ee8ce585…`, matches the HF LFS oid), with the same file names. All three repos ship the same `tokenizer.json`.
+Each export writes `files.json` with sizes and sha256 values.
 
-- **Weights.** All 320 checkpoint tensors map to graph initializers (`weightless_sharded.py`: 320
-  external, 320 `Cast` BF16→F32). Only masks and index constants stay inline, about 100 KB.
-- **Load behavior.** ONNX Runtime folds the casts at session creation. On CPU the fp32 graph for the
-  0.8B model loads in about 7 s and holds about 6.5 GB of RSS.
+- **Weights.** Every checkpoint tensor maps to a graph initializer (`weightless_sharded.py`): 320 for 0.8b and 2b,
+  426 for 4b, each an external reference plus a `Cast` BF16→F32. Only masks and index constants stay inline, about
+  100 KB.
+- **Gather before Cast.** Exports from 4b on read the embedding rows first and widen only those
+  (`Cast(Gather(E, ids))`, for the token lookup and for the label rows). The 0.8b and 2b graphs predate this and
+  widen the whole embedding at every forward pass, because ONNX Runtime does not fold a cast whose output is over
+  1 GiB. Same values either way.
+- **Load behavior.** `decision.json` `weights_in_memory` says how the weights sit in memory
+  ([ADR-0002](../decisions/0002-decoder-weights-in-memory.md)). 0.8b and 2b have no field, meaning `fp32`: ONNX
+  Runtime widens the weights once, at session creation (on CPU the 0.8B graph loads in about 7 s and holds
+  about 6.5 GB). 4b has `bf16`: the weights stay BF16 (8.4 GB) and each forward pass widens one layer's
+  weights just before it runs. The outputs are identical; only memory and speed differ.
 - **Tokenizer caveat.** The repo's `tokenizer.json` was re-saved by transformers 5.x. Its pre-tokenizer
   regex is `\p{L}+`, while the original Qwen3.5 file uses `[\p{L}\p{M}]+`. transformers 5.17's
   `Qwen2Tokenizer` uses `\p{L}+` whichever file it loads, and that is how decider was trained and is
@@ -131,17 +141,24 @@ The graph returns `label_logits[row, 0:255]`.
 
 | Type | Option logits returned by the runner | Calibration temperature |
 |---|---|---|
-| choice | `label_logits[row, :k]` | `t_choice` = upstream T |
-| noul | `label_logits[row, :2]`, which is `[no, yes]` = `[false, true]` | `t_noul` = upstream T |
-| score | `z_j = log_sigmoid((l_yes_j − l_no_j) / T)` from level row `j` | `t_score` = **1.0** |
+| choice | `label_logits[row, :k]` | `t_choice` = upstream choice T |
+| noul | `label_logits[row, :2]`, which is `[no, yes]` = `[false, true]` | `t_noul` = upstream noul T |
+| score | `z_j = log_sigmoid((l_yes_j − l_no_j) / T_score)` from level row `j` | `t_score` = **1.0** |
 
 - **Why this works for score.** The server computes `softmax(z)` = `p_yes_j / Σ p_yes`, which is
   upstream's normalised per-level fit exactly.
-- **Where T lives.** `decision.json.isolated_row_temperature` holds T, so the score temperature is
+- **Where T_score lives.** `decision.json.isolated_row_temperature` holds it, so the score temperature is
   already inside `z`.
 
-`calibration.json` stores `[T, 1.0, T]`: `[1.03, 1.0, 1.03]` for 0.8b and `[1.3, 1.0, 1.3]` for 2b.
-Upstream fitted these on in-task data; decider ships one temperature per model.
+| Model | upstream `decider_config.json` | `calibration.json` `[choice, score, noul]` | `isolated_row_temperature` |
+|---|---|---|---|
+| 0.8b | `temperature` 1.03 | `[1.03, 1.0, 1.03]` | 1.03 |
+| 2b | `temperature` 1.3 | `[1.3, 1.0, 1.3]` | 1.3 |
+| 4b (v2.1) | `temperature_by_type` choice 1.110, noul 1.560, score 1.287 | `[1.11, 1.0, 1.56]` | 1.287 |
+
+Upstream fitted these on in-task data. decider-ai 1.4.0 added `temperature_by_type`; a type the map leaves out
+uses `temperature`, and an isolated Score question uses the score temperature on each of its level rows, which is
+what `isolated_row_temperature` reproduces.
 
 ## ONNX contract
 
@@ -182,12 +199,18 @@ Additional properties:
   - The schema-first cached layout (`temperature_schema_first`), which upstream turns on explicitly.
   - Packed rows (`independent=false`).
   - Listwise score (`"isolated": false`).
-  - `neutralize_none`, which is false in both configs.
+  - `neutralize_none`, which is false in every config.
+- **noul without instructions (4b's package).** decider-4b ships the `decider/` subset of decider-ai 1.4.0, whose
+  `render_question` accepts a noul question with no `instructions` when its criteria describe true or false, and
+  asks "Which answer fits the context?". Ollaya's request parser requires `instructions` on every question, so
+  such a request gets 422 on every model. Every request that carries instructions renders identically to 2b's
+  package (checked: the 114 golden records give token-identical rows for 2b and 4b).
 
 ## Larger models
 
-- **decider-4b.** Exports with the same code. Its fp32 graph is about 16 GB at runtime, so it needs a
-  fp16/bf16 compute variant first (not validated here).
+- **decider-4b.** Converted (v2.1). Widened to fp32 its weights would take 16.8 GB, so its `decision.json` keeps
+  them BF16 in memory (8.4 GB) and widens them per forward pass; see
+  [ADR-0002](../decisions/0002-decoder-weights-in-memory.md).
 - **decider-35b-a3b.** 15 BF16 shards and a MoE backbone. An fp32 ONNX graph is impractical. The best
   path is llama.cpp with a `qwen35moe` GGUF, built from the upstream shards and fed this layout's token
   ids with the label-logit read. That GGUF is derived (conversion rewrites the tensors), so unless Mapika
@@ -196,13 +219,16 @@ Additional properties:
 
 ## Upstream benchmark numbers (model cards)
 
-| | decider-0.8b | decider-2b v10 |
-|---|---|---|
-| 69 in-task tasks, acc / ECE | 0.776 / 0.032 | 0.805 / 0.037 (v8 recipe: 0.809 / 0.030) |
-| 24–28 held-out tasks, acc / ECE | 0.707 / 0.096 | 0.755 / 0.084 (rebuilt set) |
-| JevBench public items, easy / standard / hard | – | 1.000 / 0.889 / 0.459 |
-| Bespoke public suite, macro | – | 0.704 |
-| OpenJev 5,252 rows, acc | – | 63.3 % |
+| | decider-0.8b | decider-2b v10 | decider-4b v2.1 |
+|---|---|---|---|
+| 69 in-task tasks, acc / ECE | 0.776 / 0.032 | 0.805 / 0.037 (v8 recipe: 0.809 / 0.030) | 0.831 / 0.031 (67 tasks) |
+| 24–28 held-out tasks, acc / ECE | 0.707 / 0.096 | 0.755 / 0.084 (rebuilt set) | 0.784 / 0.077 (28 tasks) |
+| JevBench public items, easy / standard / hard | – | 1.000 / 0.889 / 0.459 | 1.000 / 0.986 / 0.649 |
+| Bespoke public suite, macro | – | 0.704 | 0.756 |
+| OpenJev 5,252 rows, acc | – | 63.3 % | 66.0 % |
+
+The Decision Index 0.2 (2026-09-25) scores decider-4b at 36.58 balanced skill and decider-2b at 26.11 (Jev 51.67);
+it does not say which 4b revision it scored.
 
 ## Attribution
 
@@ -244,6 +270,39 @@ Runtime CPU, 12 threads; reference fp32 on CUDA. Report in `convert/out/decider-
   (3.76 GB, sha256 `1bf79b6a…`, matches the HF LFS oid): 320 / 320 tensors, with no unused tensors.
 - **Goldens.** `convert/out/goldens-decider-2b.jsonl`.
 
+decider-4b (v2.1): goldens from upstream fp32 on CUDA (TF32 off, the `decider/` package of the pinned
+commit, per-type temperatures), same 114 records as 2b. Their token rows are identical to decider-2b's,
+record for record: the prompt and tokenizer did not change.
+
+- **Files.** The graph is 10.5 MB. It references `Mapika/decider-4b@eb5fbdfc…/model.safetensors`
+  (8.41 GB, sha256 `ee8ce585…`, matches the HF LFS oid): 426 / 426 tensors, with no unused tensors.
+- **Goldens.** `convert/out/goldens-decider-4b.jsonl`.
+
+## Rust runtime parity (measured)
+
+`crates/ollaya-runner/examples/parity_decider.rs` against the goldens: 114 records, of which 14 are
+requests upstream rejects (a 1-option choice) with their `#valid` subsets; 479 questions, 902 rows (3 score
+questions with a legend object are skipped: TypeSafe wire rejects them). It checks rejections, token rows
+and slots, then label and option logits (tolerance 1e-3), then the decisions.
+
+```sh
+cargo run --release -p ollaya-runner --example parity_decider -- convert/out/decider-4b convert/out/goldens-decider-4b.jsonl cpu
+cargo run --release -p ollaya-runner --features ollaya-runner/cuda --example parity_decider -- convert/out/decider-4b convert/out/goldens-decider-4b.jsonl cuda
+```
+
+Results on choso-wsl (i9-13900K; RTX 4090, CUDA 13), `ort` 2.0.0-rc.13 with ONNX Runtime 1.28, each model in
+its shipped configuration (4b: `weights_in_memory: bf16`):
+
+| | decider-4b CPU | decider-4b CUDA | decider-2b CUDA |
+|---|---|---|---|
+| rejections and token rows | 0 mismatches | 0 mismatches | 0 mismatches |
+| max \|Δ label logit\| | 3.0e-5 | 2.7e-5 | 5.2e-5 |
+| decisions agree | **100 %** | **100 %** | **100 %** |
+| max \|Δ probability\| | 4.8e-6 (p99 3.1e-6) | 6.1e-6 (p99 3.8e-6) | 6.3e-6 (p99 4.2e-6) |
+
+decider-2b was re-run on CUDA after the decoder sessions switched to exact arena growth
+([ADR-0002](../decisions/0002-decoder-weights-in-memory.md)): the numbers are unchanged.
+
 ## ONNX Runtime CUDA EP note (measured)
 
 - **The bug.** ORT 1.30 CUDA EP runs these raw dynamo exports only with
@@ -255,7 +314,10 @@ Runtime CPU, 12 threads; reference fp32 on CUDA. Report in `convert/out/decider-
   folding capped at 64 elements. The CUDA EP then works with default options (checked on Qwen3Guard:
   CUDA vs CPU 1.3e-5). But it folds a few tiny weight-derived tensors into the graph (`-exp(A_log)`,
   16 floats per DeltaNet layer), and those graphs have not been through full parity.
-- **Rust runner.** It uses ORT 1.28, which was not tested. It should check this with a goldens run on CUDA.
+- **Rust runner.** ORT 1.28 through the C API, which has no `enable_mem_reuse`. The runner uses parallel
+  execution mode on CUDA instead (it reuses no buffers of the main graph; see `crates/ollaya-runner/src/decider.rs`),
+  and the CUDA parity above passes with it. The sequential executor still fails there ("requested shape
+  {11,11,-1,128}", measured 2026-09-25).
 
 ## Typed-decisions quality (measured, for the catalog comparison)
 
@@ -264,8 +326,12 @@ ONNX graphs match to about 1e-5. Metrics are those of [llm-logits.md](llm-logits
 
 | | acc (as shipped) | ECE (as shipped) | cross-fitted acc / ECE |
 |---|---|---|---|
+| decider-4b (v2.1) | 0.680 | 0.023 | 0.680 / 0.132 |
 | decider-2b | 0.591 | 0.089 | 0.591 / 0.081 |
 | decider-0.8b | 0.506 | 0.172 | 0.506 / 0.048 |
+
+decider-4b per type: choice 0.682, score 0.632, noul 0.742. Its shipped per-type temperatures calibrate this set
+better than temperatures fitted on half of it (ECE 0.023 vs 0.132 cross-fitted).
 
 For reference: Laya typed-decisions scores 0.768 (it trains on this dataset), Jev 0.738, Winnow-12B
 0.700 (Winnow's report), and generic Gemma 4 12B-it through `llm-logits-v1` 0.717.

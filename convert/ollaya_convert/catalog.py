@@ -186,6 +186,11 @@ CATALOG = {
         "license_text": "decider by Mapika (https://huggingface.co/Mapika/decider-2b)\n"
                         "Licensed under the Apache License, Version 2.0.\n\n" + LICENSE_APACHE,
         "tags": {
+            # v2.1: temperature_by_type (choice 1.110, noul 1.560, score 1.287) in decision.json/calibration.json.
+            "4b": _wl("decider-4b", "Mapika/decider-4b", "eb5fbdfc9448473ec25e399882912863afbdb70e",
+                      "Largest decider (Qwen3.5-4B base, v2.1): reads option-letter logits at an answer slot, with one "
+                      "fitted temperature per answer type. Needs about 9 GB of memory.",
+                      "4.2B", 32768, ["en"], wl_dir=os.path.join(OUT, "decider-4b")),
             "2b": _wl("decider-2b", "Mapika/decider-2b", "9839cc9d908be16c5988c0d041034b5fdf82c7a2",
                       "Decoder decision model (Qwen3.5-2B base): reads option-letter logits at an answer slot. "
                       "Highest accuracy of the open models Ollaya ships.",
