@@ -88,7 +88,7 @@ def winnow_cases(decision):
 
 
 def jevk5_cases(decision, upstream=None):
-    from ..jevk5.ref import JevK5Error, TooManyOptions, compile_request
+    from ..jevk5.ref import POST, PRE, JevK5Error, TooManyOptions, compile_request
 
     if upstream:
         import sys
@@ -105,10 +105,11 @@ def jevk5_cases(decision, upstream=None):
             rec["error"] = "too_many_options" if isinstance(e, TooManyOptions) else "invalid"
             out.append(rec)
             continue
-        rec["expected"] = [{"qid": q, "type": k, "keys": keys, "prompt": p, "label_ids": ids[:len(keys)],
-                            "wire_order": wire} for q, k, keys, p, wire in compiled]
+        rec["expected"] = [{"qid": q, "type": k, "keys": keys, "prompt": PRE + u + POST, "label_ids": ids[:len(keys)],
+                            "wire_order": wire} for q, k, keys, u, wire in compiled]
         if upstream:
-            for q, _, keys, p, wire in compiled:
+            for q, _, keys, u, wire in compiled:
+                p = PRE + u + POST
                 opts = up.decision_options(questions[q])
                 assert sorted(k for k, _ in opts) == sorted(keys), (cid, q)
                 assert [k for k, _ in opts] == [keys[wire.index(i)] for i in range(len(keys))], (cid, q)

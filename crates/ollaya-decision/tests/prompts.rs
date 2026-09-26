@@ -5,7 +5,7 @@
 //! sends (the jevk5 prompts also checked against the author's own `jevk5.prompt`). Token ids and
 //! logits need the model; `cargo run -p ollaya-runner --example parity_llama` checks those.
 
-use ollaya_decision::jevk5::JevK5Config;
+use ollaya_decision::jevk5::{self, JevK5Config};
 use ollaya_decision::llm_logits::{self, LlmLogitsConfig};
 use ollaya_decision::winnow::{self, WinnowConfig};
 use ollaya_decision::{Error, QType};
@@ -140,7 +140,7 @@ fn jevk5_prompts_match_the_reference() {
         for ((qid, q), w) in questions.iter().zip(want) {
             assert_eq!(qid, w["qid"].as_str().unwrap(), "{id}: question order");
             assert_eq!(
-                q.prompt,
+                format!("{}{}{}", jevk5::pre(), q.user, jevk5::POST),
                 w["prompt"].as_str().unwrap(),
                 "{id}/{qid}: prompt"
             );

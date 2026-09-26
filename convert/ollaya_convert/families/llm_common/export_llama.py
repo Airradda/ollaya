@@ -196,8 +196,8 @@ class Winnow:
 
 
 class JevK5:
-    """jevk5-v1: one prompt per question, tokenized whole with special parsing (as the author's
-    `JevK5GGUF` does), and evaluated as one cold pass: Qwen3.5's recurrent layers cannot be cut back
+    """jevk5-v1: one prompt per question, the template pieces tokenized with special parsing and the
+    user message without it (so a state never forms a control token), evaluated as one cold pass: Qwen3.5's recurrent layers cannot be cut back
     to a shared prefix, so the plan is `cold`. A prompt that does not fit the context is rejected."""
 
     def __init__(self, srv, a):
@@ -223,8 +223,10 @@ class JevK5:
         compiled = self.ref.compile_request(state, questions)
         n = len(self.srv.tokenize(self.ref.render_state(state), add_special=False, parse_special=False))
         rows = []
-        for qid, _, keys, prompt, wire in compiled:
-            ids = self.srv.tokenize(prompt, add_special=False, parse_special=True)
+        pre = self.srv.tokenize(self.ref.PRE, add_special=False, parse_special=True)
+        post = self.srv.tokenize(self.ref.POST, add_special=False, parse_special=True)
+        for qid, _, keys, user, wire in compiled:
+            ids = pre + self.srv.tokenize(user, add_special=False, parse_special=False) + post
             if len(ids) >= self.n_ctx:
                 raise self.ref.JevK5Error("question %r: the prompt is %d tokens, the context holds %d"
                                           % (qid, len(ids), self.n_ctx))

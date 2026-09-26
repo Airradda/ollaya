@@ -34,9 +34,11 @@ reads the label logits at the last token with `llama_get_logits_ith`; see
 ```
 user   = json.dumps({"evidence": state, "criterion": instructions,
                      "options": [{"letter": "A", "description": text_0}, ...]}, ensure_ascii=False)
-prompt = "<|im_start|>system\n" + SYSTEM + "<|im_end|>\n<|im_start|>user\n" + user
-         + "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
-ids    = tokenize(prompt, add_special=false, parse_special=true)
+pre    = "<|im_start|>system\n" + SYSTEM + "<|im_end|>\n<|im_start|>user\n"
+post   = "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+prompt = pre + user + post                                  (the author's text, byte for byte)
+ids    = tokenize(pre, parse_special=true) ⧺ tokenize(user, parse_special=false)
+         ⧺ tokenize(post, parse_special=true)               (no BOS)
 
 SYSTEM = "Apply the supplied criterion to the supplied evidence. Choose exactly one listed option.
           Respond with only its uppercase letter, with no explanation or reasoning."    (one line)
@@ -44,9 +46,14 @@ SYSTEM = "Apply the supplied criterion to the supplied evidence. Choose exactly 
 
 - `json.dumps` is Python's default (`", "` / `": "`, non-ASCII kept), as in `pyjson.rs`. The state and
   instructions go in as JSON values, whatever their type.
-- The whole prompt is tokenized with special-token parsing, as `JevK5GGUF` and the transformers
-  tokenizer do. Unlike `winnow-v1` and `llm-logits-v1`, a state containing `<|im_end|>` therefore
-  reads as that control token, exactly as in the author's runtime.
+- **Control tokens.** Special tokens are parsed only in Ollaya's own template pieces; the user
+  message (state, question and options) is tokenized with special parsing off, as in `winnow-v1` and
+  `llm-logits-v1`. A state containing `<|im_end|>` therefore stays text and can never close the user
+  turn. This departs from the author: `JevK5GGUF` and the transformers tokenizer parse specials in the
+  whole prompt. The ids differ only when the request contains control-token text: on the pinned
+  tokenizer, 447 of the 450 fixture prompts have identical ids both ways, and the 3 that differ are
+  the `dec/control_tokens` case (`<|im_start|>`, `<|im_end|>`, `<|endoftext|>`, `<|fim_*|>` in the
+  state). All template pieces end in `\n` or a special token, so no BPE merge crosses a boundary.
 - No BOS: Qwen3.5 adds none, and the reference tokenizes with `add_special=false`.
 
 ### Options (`decision_options`)
@@ -112,5 +119,6 @@ easy 1.000, standard 0.944, hard 0.784, the same as bf16.
 
 - **Options.** 1 to 16 per question; more is TOO_MANY_OPTIONS (the author's knockout is not ported).
 - **Context.** State, question and options share 16,384 tokens; a longer prompt is rejected, not cut.
-- **Control tokens.** Text in the state is tokenized with special parsing, as in the author's runtime.
+- **Control tokens.** Text in the state, question and options is never parsed as a control token
+  (unlike the author's runtime).
 - **Cost.** One cold pass per question: the state is evaluated again for every question.

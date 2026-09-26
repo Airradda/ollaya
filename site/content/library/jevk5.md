@@ -36,7 +36,7 @@ Point any TypeSafe client at `http://localhost:11435` and set the model to `jevk
 
 - **Options.** 1 to 16 per question. The author's runtime reads more options in several passes and combines them (a knockout); Ollaya does not, and answers a question with more than 16 options with `TOO_MANY_OPTIONS`.
 - **Context.** State, question and options share 16,384 tokens. A longer prompt is rejected, not cut.
-- **Control tokens.** As in the author's runtime, the whole prompt is read with special tokens enabled, so text such as `<|im_end|>` in a state acts as a Qwen control token.
+- **Control tokens.** Text you send can never become one of Qwen's control tokens: `<|im_end|>` in a state stays text. The author's runtime reads such text as a control token, so on those inputs only, Ollaya's tokens differ from the author's.
 - **Size.** A 4B language model: a GPU makes a large difference.
 
 ## Weights and license

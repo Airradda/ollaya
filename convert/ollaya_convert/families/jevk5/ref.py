@@ -6,12 +6,17 @@ f944fe37ff1d5ed3830aa4c8d88b7189c8c1268a), which follows SemIf (TheoLeeCJ/SemIf,
                          "options": [{"letter": "A", "description": text_0}, ...]}, ensure_ascii=False)
     prompt = "<|im_start|>system\\n" + SYSTEM + "<|im_end|>\\n<|im_start|>user\\n" + user
              + "<|im_end|>\\n<|im_start|>assistant\\n<think>\\n\\n</think>\\n\\n"
-    ids    = tokenize(prompt, add_special=False, parse_special=True)
+    ids    = tokenize(PRE, parse_special=True) + tokenize(user) + tokenize(POST, parse_special=True)
 
 Option texts are "id: description" (`decision_options`): noul reads `true` (A) then `false` (B), with
 "The proposition is {k}." for a missing description; a choice falls back to its id; a score level is
 its index. The option logits are the letters' logits at the last token; the author's calibration is
 one temperature over them (`jevk5_config.json`).
+
+The text is the author's prompt byte for byte. The author tokenizes it whole with special parsing, so
+`<|im_end|>` inside a state would become a control token; Ollaya parses specials only in its own
+template pieces (PRE, POST), as winnow-v1 and llm-logits-v1 do. Without control-token text in the
+request the ids are the same.
 
 The author's runtime reads more than 16 options in several passes combined by a knockout
 (`prompt.spread`) with a second temperature. `jevk5-v1` covers up to 16 options, one pass per
@@ -32,6 +37,9 @@ CHAT_TEMPLATE = (
     "<|im_start|>user\n{user}<|im_end|>\n"
     "<|im_start|>assistant\n<think>\n\n</think>\n\n"
 )
+PRE = "<|im_start|>system\n" + SYSTEM + "<|im_end|>\n<|im_start|>user\n"
+POST = "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+assert CHAT_TEMPLATE.format(system=SYSTEM, user="\x00") == PRE + "\x00" + POST
 UPSTREAM = {"runtime": "https://github.com/allebee/jevk5", "commit": "f944fe37ff1d5ed3830aa4c8d88b7189c8c1268a",
             "source": "jevk5/prompt.py"}
 
@@ -49,14 +57,19 @@ def render_state(state) -> str:
     return json.dumps(state, ensure_ascii=False)
 
 
-def prompt_text(state, criterion, texts) -> str:
-    """`prompt.prompt_text`: the full prompt, chat template included."""
+def user_message(state, criterion, texts) -> str:
+    """The user message of `prompt.messages`: the decision as JSON."""
     payload = {
         "evidence": state,
         "criterion": criterion,
         "options": [{"letter": LETTERS[i], "description": d} for i, d in enumerate(texts)],
     }
-    return CHAT_TEMPLATE.format(system=SYSTEM, user=json.dumps(payload, ensure_ascii=False))
+    return json.dumps(payload, ensure_ascii=False)
+
+
+def prompt_text(state, criterion, texts) -> str:
+    """`prompt.prompt_text`: the full prompt, chat template included."""
+    return CHAT_TEMPLATE.format(system=SYSTEM, user=user_message(state, criterion, texts))
 
 
 def compile_question(qid, q):
@@ -95,12 +108,12 @@ def compile_question(qid, q):
 
 
 def compile_request(state, questions):
-    """Every question's (qid, type, keys, prompt, wire order), in request order. The request is
+    """Every question's (qid, type, keys, user message, wire order), in request order. The request is
     rejected as a whole when any question is."""
     if not isinstance(questions, dict) or not questions:
         raise JevK5Error("questions must contain at least one named question")
     out = []
     for qid, q in questions.items():
         kind, keys, texts, wire = compile_question(qid, q)
-        out.append((qid, kind, keys, prompt_text(state, q.get("instructions"), texts), wire))
+        out.append((qid, kind, keys, user_message(state, q.get("instructions"), texts), wire))
     return out

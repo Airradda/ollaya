@@ -689,7 +689,8 @@ impl LlamaModel {
                 let n_ctx = self.settings.n_ctx;
                 let mut rows = Vec::with_capacity(prompts.len());
                 for (qid, q) in prompts {
-                    let ids = vocab.tokenize(&q.prompt, false, true)?;
+                    let ids =
+                        jevk5::token_ids(&q.user, |t, special| vocab.tokenize(t, false, special))?;
                     if ids.len() >= n_ctx {
                         return Err(ollaya_decision::Error::invalid(format!(
                             "question {qid:?}: the prompt is {} tokens, and the model's context \
