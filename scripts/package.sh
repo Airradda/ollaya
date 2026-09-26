@@ -405,8 +405,9 @@ stage_base() {
     case $PLATFORM in
         linux-amd64 | windows-amd64)
             runner=${OLLAYA_CUDA_RUNNER:-}
-            [ -n "$runner" ] && [ -f "$runner" ] ||
+            if [ -z "$runner" ] || [ ! -f "$runner" ]; then
                 die "set OLLAYA_CUDA_RUNNER to ollaya built with --features ollaya-runner/cuda-dynamic"
+            fi
             mkdir -p "$root/lib/ollaya"
             cp "$runner" "$root/lib/ollaya/ollaya-cuda-runner$EXE"
             chmod 0755 "$root/lib/ollaya/ollaya-cuda-runner$EXE"

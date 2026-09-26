@@ -75,6 +75,8 @@ fn plan(device: &str, onnx: bool, has_cpu_exe: bool) -> Plan {
 /// One way to start a runner.
 struct Launch<'a> {
     exe: &'a Path,
+    // argv[0] can only be set on Unix; Windows runners never read it.
+    #[cfg_attr(not(unix), allow(dead_code))]
     arg0: Option<&'a Path>,
     env: &'a [(String, String)],
     device: &'a str,
