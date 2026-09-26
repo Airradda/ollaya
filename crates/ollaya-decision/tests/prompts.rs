@@ -1,9 +1,11 @@
 //! The llama layouts against their Python references, case for case.
 //!
 //! Fixtures: `convert/ollaya_convert/families/llm_common/prompt_goldens.py`, which runs
-//! `llm_logits/ref.py` and `winnow/ref.py` on the engine-form requests the daemon sends. Token ids
-//! and logits need the model; `cargo run -p ollaya-runner --example parity_llama` checks those.
+//! `llm_logits/ref.py`, `winnow/ref.py` and `jevk5/ref.py` on the engine-form requests the daemon
+//! sends (the jevk5 prompts also checked against the author's own `jevk5.prompt`). Token ids and
+//! logits need the model; `cargo run -p ollaya-runner --example parity_llama` checks those.
 
+use ollaya_decision::jevk5::JevK5Config;
 use ollaya_decision::llm_logits::{self, LlmLogitsConfig};
 use ollaya_decision::winnow::{self, WinnowConfig};
 use ollaya_decision::{Error, QType};
@@ -117,4 +119,40 @@ fn winnow_prompts_match_the_reference() {
         }
     }
     assert!(checked > 200, "only {checked} questions checked");
+}
+
+#[test]
+fn jevk5_prompts_match_the_reference() {
+    let config: JevK5Config = serde_json::from_str(&fixture("jevk5_decision.json")).unwrap();
+    config.validate().unwrap();
+    let mut checked = 0;
+    for case in cases("jevk5_prompts.jsonl") {
+        let id = case["id"].as_str().unwrap();
+        let got = config.questions(&case["state"], &case["questions"]);
+        if let Some(err) = case["error"].as_str() {
+            let e = got.expect_err(&format!("{id}: expected {err}"));
+            assert_eq!(error_class(&e), err, "{id}: {e}");
+            continue;
+        }
+        let questions = got.unwrap_or_else(|e| panic!("{id}: {e}"));
+        let want = case["expected"].as_array().unwrap();
+        assert_eq!(questions.len(), want.len(), "{id}: questions");
+        for ((qid, q), w) in questions.iter().zip(want) {
+            assert_eq!(qid, w["qid"].as_str().unwrap(), "{id}: question order");
+            assert_eq!(
+                q.prompt,
+                w["prompt"].as_str().unwrap(),
+                "{id}/{qid}: prompt"
+            );
+            assert_eq!(q.qtype, qtype(&w["type"]), "{id}/{qid}: type");
+            let keys: Vec<String> = serde_json::from_value(w["keys"].clone()).unwrap();
+            assert_eq!(q.keys, keys, "{id}/{qid}: keys");
+            let ids: Vec<u32> = serde_json::from_value(w["label_ids"].clone()).unwrap();
+            assert_eq!(q.label_ids, ids, "{id}/{qid}: label ids");
+            let wire: Vec<usize> = serde_json::from_value(w["wire_order"].clone()).unwrap();
+            assert_eq!(q.wire_order, wire, "{id}/{qid}: wire order");
+            checked += 1;
+        }
+    }
+    assert!(checked > 400, "only {checked} questions checked");
 }

@@ -18,8 +18,8 @@ pub trait Engine: Send + Sync {
     fn run(&self, state: &Value, questions: &Questions) -> Result<Output, Error>;
 
     /// Answer a request whose questions are the JSON the daemon sent. Engines whose layouts
-    /// validate the definitions themselves (llama.cpp's `winnow-v1`, `llm-logits-v1`) override
-    /// it; the rest parse the typed questions first.
+    /// validate the definitions themselves (llama.cpp's `winnow-v1`, `llm-logits-v1`, `jevk5-v1`)
+    /// override it; the rest parse the typed questions first.
     fn run_json(&self, state: &Value, questions: &Value) -> Result<Output, Error> {
         let questions = ollaya_decision::parse_questions(questions)?;
         self.run(state, &questions)

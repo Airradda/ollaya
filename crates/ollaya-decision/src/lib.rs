@@ -10,6 +10,7 @@ pub mod calibration;
 pub mod decider;
 pub mod decision;
 pub mod gliclass;
+pub mod jevk5;
 pub mod kev;
 pub mod layout;
 pub mod llm_logits;

@@ -17,7 +17,7 @@ use serde_json::Value;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, Command};
 
-use ollaya_decision::{llm_logits, winnow};
+use ollaya_decision::{jevk5, llm_logits, winnow};
 use ollaya_registry::pull::RunCheck;
 
 use crate::Error;
@@ -48,7 +48,7 @@ pub struct SchedulerConfig {
 }
 
 /// The GGUF layouts this build's runner can run (`ollaya_runner::llama::LAYOUTS`).
-pub const LLAMA_LAYOUTS: &[&str] = &[llm_logits::LAYOUT, winnow::LAYOUT];
+pub const LLAMA_LAYOUTS: &[&str] = &[llm_logits::LAYOUT, winnow::LAYOUT, jevk5::LAYOUT];
 
 #[derive(Debug, Deserialize)]
 struct Hello {

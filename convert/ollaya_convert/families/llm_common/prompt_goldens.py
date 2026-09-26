@@ -2,11 +2,16 @@
 references. No server: the label tables come from exported `decision.json` files.
 
     uv run python -m ollaya_convert.families.llm_common.prompt_goldens \
-        --llm-logits out/llm-logits-gemma-4-12b-it-q4_0/decision.json --winnow out/winnow-12b-q8_0/decision.json
+        --llm-logits out/llm-logits-gemma-4-12b-it-q4_0/decision.json --winnow out/winnow-12b-q8_0/decision.json \
+        --jevk5 out/jevk5-4b-q8_0/decision.json --jevk5-upstream <allebee/jevk5 checkout at f944fe3>
 
-Writes crates/ollaya-decision/tests/fixtures/{llm_logits,winnow}_prompts.jsonl: per case the engine-form
-request and, per question, the text the model reads (llm-logits: the user message; winnow: the prefix and
-each suffix), the label ids and the wire order, or the error class the runtime must answer with.
+Writes crates/ollaya-decision/tests/fixtures/{llm_logits,winnow,jevk5}_prompts.jsonl (for the layouts
+given): per case the engine-form request and, per question, the text the model reads (llm-logits: the
+user message; winnow: the prefix and each suffix; jevk5: the whole prompt), the label ids and the wire
+order, or the error class the runtime must answer with.
+
+`--jevk5-upstream` also checks every jevk5 prompt against the author's own `jevk5.prompt`
+(`decision_options` and `prompt_text`), so the fixtures are the reference's text, not only the port's.
 """
 from __future__ import annotations
 
@@ -82,6 +87,40 @@ def winnow_cases(decision):
     return out
 
 
+def jevk5_cases(decision, upstream=None):
+    from ..jevk5.ref import JevK5Error, TooManyOptions, compile_request
+
+    if upstream:
+        import sys
+        sys.path.insert(0, upstream)
+        from jevk5 import prompt as up
+    ids = decision["labels"]["ids"]
+    out, checked = [], 0
+    for cid, state, qs in all_cases():
+        questions = engine_form(qs)
+        rec = {"id": cid, "state": state, "questions": questions}
+        try:
+            compiled = compile_request(state, questions)
+        except JevK5Error as e:
+            rec["error"] = "too_many_options" if isinstance(e, TooManyOptions) else "invalid"
+            out.append(rec)
+            continue
+        rec["expected"] = [{"qid": q, "type": k, "keys": keys, "prompt": p, "label_ids": ids[:len(keys)],
+                            "wire_order": wire} for q, k, keys, p, wire in compiled]
+        if upstream:
+            for q, _, keys, p, wire in compiled:
+                opts = up.decision_options(questions[q])
+                assert sorted(k for k, _ in opts) == sorted(keys), (cid, q)
+                assert [k for k, _ in opts] == [keys[wire.index(i)] for i in range(len(keys))], (cid, q)
+                want = up.prompt_text(state, questions[q]["instructions"], [t for _, t in opts])
+                assert want == p, (cid, q, want, p)
+                checked += 1
+        out.append(rec)
+    if upstream:
+        print("jevk5: %d prompts identical to the author's jevk5.prompt" % checked)
+    return out
+
+
 def all_cases():
     # Long states only repeat text; truncation is token-level and the GPU parity run covers it.
     extra = [x for x in EXTRA if x[0] != "extra/truncated_state"] + EXTRA_TEXT
@@ -91,21 +130,24 @@ def all_cases():
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--llm-logits", required=True)
-    ap.add_argument("--winnow", required=True)
+    ap.add_argument("--llm-logits")
+    ap.add_argument("--winnow")
+    ap.add_argument("--jevk5")
+    ap.add_argument("--jevk5-upstream", help="a checkout of github.com/allebee/jevk5 at the pinned commit")
     a = ap.parse_args()
     os.makedirs(FIXTURES, exist_ok=True)
-    for name, rows in (("llm_logits_prompts.jsonl", llm_logits_cases(json.load(open(a.llm_logits)))),
-                       ("winnow_prompts.jsonl", winnow_cases(json.load(open(a.winnow))))):
-        path = os.path.normpath(os.path.join(FIXTURES, name))
+    layouts = (("llm_logits", a.llm_logits, llm_logits_cases), ("winnow", a.winnow, winnow_cases),
+               ("jevk5", a.jevk5, lambda d: jevk5_cases(d, a.jevk5_upstream)))
+    for name, decision, build in layouts:
+        if not decision:
+            continue
+        path = os.path.normpath(os.path.join(FIXTURES, name + "_prompts.jsonl"))
         with open(path, "w") as f:
-            for r in rows:
+            for r in build(json.load(open(decision))):
                 f.write(json.dumps(r, ensure_ascii=False) + "\n")
-        print(path, len(rows), "cases")
-    with open(os.path.join(FIXTURES, "llm_logits_decision.json"), "w") as f:
-        json.dump(json.load(open(a.llm_logits)), f, ensure_ascii=False, indent=1)
-    with open(os.path.join(FIXTURES, "winnow_decision.json"), "w") as f:
-        json.dump(json.load(open(a.winnow)), f, ensure_ascii=False, indent=1)
+        print(path, "written")
+        with open(os.path.join(FIXTURES, name + "_decision.json"), "w") as f:
+            json.dump(json.load(open(decision)), f, ensure_ascii=False, indent=1)
 
 
 if __name__ == "__main__":

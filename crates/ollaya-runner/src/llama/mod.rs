@@ -1,4 +1,5 @@
-//! The llama.cpp engine: GGUF decision models (`winnow-v1`, `llm-logits-v1`) on libllama, inside
+//! The llama.cpp engine: GGUF decision models (`winnow-v1`, `llm-logits-v1`, `jevk5-v1`) on
+//! libllama, inside
 //! the runner process (docs/decisions/0003-llama-cpp-runtime.md).
 //!
 //! The libraries are llama.cpp's own release build, loaded at run time from the install
@@ -13,7 +14,8 @@
 //! reading the logits at the last token. llama.cpp's numbers depend on how a prompt is split into
 //! batches, so the split is part of the model's numerics; the goldens' reference
 //! (`convert/ollaya_convert/families/llm_common/plan.py`, on the same build's llama-server) uses
-//! the same one.
+//! the same one. A model whose cache cannot be cut back to a prefix (Qwen3.5's recurrent layers,
+//! `jevk5-v1`) uses the `cold` plan: every question is one cold pass.
 
 pub mod ffi;
 
@@ -23,6 +25,7 @@ use std::ptr::NonNull;
 use std::sync::Mutex;
 
 use ollaya_decision::Questions;
+use ollaya_decision::jevk5::{self, JevK5Config};
 use ollaya_decision::llm_logits::{self, LlmLogitsConfig};
 use ollaya_decision::winnow::{self, WinnowConfig};
 use serde::Deserialize;
@@ -32,7 +35,7 @@ use crate::{Error, Output, QuestionOutput};
 use ffi::{Api, Batch, Token};
 
 /// Layouts the llama engine runs.
-pub const LAYOUTS: &[&str] = &[llm_logits::LAYOUT, winnow::LAYOUT];
+pub const LAYOUTS: &[&str] = &[llm_logits::LAYOUT, winnow::LAYOUT, jevk5::LAYOUT];
 
 /// Tokens per `llama_decode` call and per physical batch: llama-server's defaults, which the
 /// goldens' reference runs with.
@@ -103,6 +106,7 @@ enum Layout {
         bos: Option<Token>,
     },
     Winnow(WinnowConfig),
+    JevK5(JevK5Config),
 }
 
 /// One question, ready to evaluate.
@@ -454,6 +458,11 @@ fn prepare(vocab: &Vocab, decision: &Value) -> Result<Layout, Error> {
             cfg.validate().map_err(bad)?;
             Layout::Winnow(cfg)
         }
+        Some(jevk5::LAYOUT) => {
+            let cfg: JevK5Config = serde_json::from_value(decision.clone()).map_err(parse_error)?;
+            cfg.validate().map_err(bad)?;
+            Layout::JevK5(cfg)
+        }
         other => {
             return Err(model_error(format!(
                 "the llama engine cannot run layout {other:?}"
@@ -465,6 +474,7 @@ fn prepare(vocab: &Vocab, decision: &Value) -> Result<Layout, Error> {
             vec![&cfg.labels.choice, &cfg.labels.score, &cfg.labels.noul]
         }
         Layout::Winnow(cfg) => vec![&cfg.labels],
+        Layout::JevK5(cfg) => vec![&cfg.labels],
     };
     for table in tables {
         for (s, &id) in table.strings.iter().zip(&table.ids) {
@@ -667,6 +677,41 @@ impl LlamaModel {
                     rows,
                     state_tokens,
                     state_truncated,
+                })
+            }
+            Layout::JevK5(cfg) => {
+                // No state cut: the state sits inside the JSON payload, so a prompt that does
+                // not fit the context is rejected, as the reference rejects it.
+                let prompts = cfg.questions(state, questions)?;
+                let state_tokens = vocab
+                    .tokenize(&jevk5::render_state(state), false, false)?
+                    .len();
+                let n_ctx = self.settings.n_ctx;
+                let mut rows = Vec::with_capacity(prompts.len());
+                for (qid, q) in prompts {
+                    let ids = vocab.tokenize(&q.prompt, false, true)?;
+                    if ids.len() >= n_ctx {
+                        return Err(ollaya_decision::Error::invalid(format!(
+                            "question {qid:?}: the prompt is {} tokens, and the model's context \
+                             holds {n_ctx}; shorten the state, the question or its options",
+                            ids.len()
+                        ))
+                        .into());
+                    }
+                    rows.push((
+                        qid,
+                        Row {
+                            ids,
+                            p: 0,
+                            candidates: q.label_ids.iter().map(|&t| t as Token).collect(),
+                            wire_order: q.wire_order,
+                        },
+                    ));
+                }
+                Ok(Encoded {
+                    rows,
+                    state_tokens,
+                    state_truncated: false,
                 })
             }
         }

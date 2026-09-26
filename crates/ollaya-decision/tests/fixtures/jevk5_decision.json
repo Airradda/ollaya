@@ -1,0 +1,64 @@
+{
+ "engine": "llama",
+ "family": "jevk5",
+ "layout": "jevk5-v1",
+ "labels": {
+  "strings": [
+   "A",
+   "B",
+   "C",
+   "D",
+   "E",
+   "F",
+   "G",
+   "H",
+   "I",
+   "J",
+   "K",
+   "L",
+   "M",
+   "N",
+   "O",
+   "P"
+  ],
+  "ids": [
+   32,
+   33,
+   34,
+   35,
+   36,
+   37,
+   38,
+   39,
+   40,
+   41,
+   42,
+   43,
+   44,
+   45,
+   46,
+   47
+  ]
+ },
+ "upstream": {
+  "runtime": "https://github.com/allebee/jevk5",
+  "commit": "f944fe37ff1d5ed3830aa4c8d88b7189c8c1268a",
+  "source": "jevk5/prompt.py"
+ },
+ "gguf": {
+  "repo": "alibiserikbay/JevK5-GGUF",
+  "revision": "ec67b0bfce5119a8b11a2cdb430bb43e3fa3e82a",
+  "path": "jevk5-4b-v0.3-Q8_0.gguf",
+  "sha256": "aea433883bc7ed399f2fbd539e53d2eac7caf71a946fe6650995a413979d4a30",
+  "size": 4482402720,
+  "quantization": "Q8_0",
+  "architecture": "qwen35",
+  "url": "https://huggingface.co/alibiserikbay/JevK5-GGUF/resolve/ec67b0bfce5119a8b11a2cdb430bb43e3fa3e82a/jevk5-4b-v0.3-Q8_0.gguf"
+ },
+ "llama": {
+  "n_ctx": 16384,
+  "swa_full": false,
+  "plan": "cold",
+  "build": "b11146"
+ }
+}

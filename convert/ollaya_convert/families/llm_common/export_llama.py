@@ -8,8 +8,12 @@ and goldens (prompt token ids and option logits through the fixed evaluation pla
         --server ... --gguf .../gemma-4-12B-it-Q4_0.gguf --slug gemma-4-12b-it-q4_0 \
         --repo ggml-org/gemma-4-12B-it-GGUF --revision <sha> --file gemma-4-12B-it-Q4_0.gguf \
         --calibration out/llm-logits-gemma-4-12b-it-q4_0/calibration.json
+    uv run python -m ollaya_convert.families.llm_common.export_llama jevk5 \
+        --server ... --gguf .../jevk5-4b-v0.3-Q8_0.gguf --slug 4b-q8_0 \
+        --repo alibiserikbay/JevK5-GGUF --revision <sha> --file jevk5-4b-v0.3-Q8_0.gguf \
+        --temperature 1.22 --n-ctx 16384
 
-Writes out/<layout>-<slug>/ (llm-logits-<slug> or winnow-<slug>):
+Writes out/<layout>-<slug>/ (llm-logits-<slug>, winnow-<slug> or jevk5-<slug>):
   decision.json          layout, GGUF pin, template pieces / flags, label tables, llama-server settings
   calibration.json
   goldens-<device>.jsonl per case: state/questions (engine form), state_tokens/state_truncated, and per
@@ -17,7 +21,8 @@ Writes out/<layout>-<slug>/ (llm-logits-<slug> or winnow-<slug>):
                          or the error class the runtime must answer with
   goldens-<device>.meta.json  the llama-server build, device and arguments
 
-The reference is the family's Python port of the author's prompt (`winnow/ref.py`, `llm_logits/ref.py`)
+The reference is the family's Python port of the author's prompt (`winnow/ref.py`, `jevk5/ref.py`,
+`llm_logits/ref.py`)
 on the pinned llama-server build Ollaya ships, started with the runtime's exact arguments
 (`plan.server_args`) and driven through the runtime's fixed evaluation plan (`plan.py`). The Rust
 runtime must reproduce the token ids exactly and the option logits on the same build and device
@@ -190,6 +195,43 @@ class Winnow:
         return n, n > MAX_STATE_TOKENS, rows
 
 
+class JevK5:
+    """jevk5-v1: one prompt per question, tokenized whole with special parsing (as the author's
+    `JevK5GGUF` does), and evaluated as one cold pass: Qwen3.5's recurrent layers cannot be cut back
+    to a shared prefix, so the plan is `cold`. A prompt that does not fit the context is rejected."""
+
+    def __init__(self, srv, a):
+        from ..jevk5 import ref
+        self.ref = ref
+        self.srv = srv
+        self.n_ctx = a.n_ctx
+        labels = []
+        for s in ref.LETTERS:
+            ids = srv.tokenize(s, add_special=False, parse_special=False)
+            if len(ids) != 1 or srv.pieces(ids)[0] != s:
+                raise SystemExit("label %r is not one token in this GGUF: %s" % (s, ids))
+            labels.append(ids[0])
+        self.labels = labels
+        self.decision = {
+            "family": "jevk5", "layout": ref.LAYOUT,
+            "labels": {"strings": list(ref.LETTERS), "ids": labels},
+            "upstream": ref.UPSTREAM,
+        }
+        self.plan = "cold"
+
+    def encode(self, state, questions):
+        compiled = self.ref.compile_request(state, questions)
+        n = len(self.srv.tokenize(self.ref.render_state(state), add_special=False, parse_special=False))
+        rows = []
+        for qid, _, keys, prompt, wire in compiled:
+            ids = self.srv.tokenize(prompt, add_special=False, parse_special=True)
+            if len(ids) >= self.n_ctx:
+                raise self.ref.JevK5Error("question %r: the prompt is %d tokens, the context holds %d"
+                                          % (qid, len(ids), self.n_ctx))
+            rows.append((qid, ids, 0, self.labels[:len(keys)], wire))
+        return n, False, rows
+
+
 def winnow_error_class(state, questions, labels, template):
     """The runtime's error class for a request compile() rejects: the first failing question decides.
     More options than the label table holds is 422 TOO_MANY_OPTIONS in Ollaya, anything else 400."""
@@ -208,6 +250,9 @@ def winnow_error_class(state, questions, labels, template):
 def error_class(layout, lay, state, questions, e):
     if layout == "winnow":
         return winnow_error_class(state, winnow_questions(questions), lay.labels, lay.template)
+    if layout == "jevk5":
+        from ..jevk5.ref import TooManyOptions
+        return "too_many_options" if isinstance(e, TooManyOptions) else "invalid"
     return "too_many_options" if "exceed this model's" in str(e) else "invalid"
 
 
@@ -224,7 +269,7 @@ def server_version(binary):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("layout", choices=["llm-logits", "winnow"])
+    ap.add_argument("layout", choices=["llm-logits", "winnow", "jevk5"])
     ap.add_argument("--server", required=True, help="the pinned llama-server build the runtime ships")
     ap.add_argument("--gguf", required=True)
     ap.add_argument("--slug", required=True)
@@ -233,7 +278,7 @@ def main():
     ap.add_argument("--file", required=True)
     ap.add_argument("--calibration", default=None, help="llm-logits: fitted calibration.json (demo output)")
     ap.add_argument("--temperature", type=float, default=None,
-                    help="winnow: the author's fitted decision temperature (default 1.0, Winnow's own default)")
+                    help="winnow, jevk5: the author's fitted decision temperature (default 1.0)")
     ap.add_argument("--temperature-source", default="")
     ap.add_argument("--upstream-commit", default="6c2b3c04e248a319f2cb43832628eba03e55fe38",
                     help="winnow: the winnow-inference commit the model card pins")
@@ -254,7 +299,7 @@ def main():
                             log=os.path.join(out, "llama-server-%s.log" % device_class(a.device)), timeout=1800)
     try:
         props = srv.props()
-        lay = (LlmLogits if a.layout == "llm-logits" else Winnow)(srv, a)
+        lay = {"llm-logits": LlmLogits, "winnow": Winnow, "jevk5": JevK5}[a.layout](srv, a)
         sha = sha256_file(a.gguf)
         decision = {"engine": "llama", **lay.decision}
         decision["gguf"] = {
@@ -263,7 +308,8 @@ def main():
             "architecture": meta.get("general.architecture", ""),
             "url": "https://huggingface.co/%s/resolve/%s/%s" % (a.repo, a.revision, a.file),
         }
-        decision["llama"] = {"n_ctx": a.n_ctx, "swa_full": swa, "plan": "prefix", "build": LLAMA_BUILD}
+        decision["llama"] = {"n_ctx": a.n_ctx, "swa_full": swa, "plan": getattr(lay, "plan", "prefix"),
+                             "build": LLAMA_BUILD}
         with open(os.path.join(out, "decision.json"), "w") as f:
             json.dump(decision, f, indent=1, ensure_ascii=False)
         if a.calibration:

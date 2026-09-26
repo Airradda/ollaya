@@ -1,7 +1,7 @@
-//! Compare the llama.cpp engine (`winnow-v1`, `llm-logits-v1`) against golden fixtures from
-//! `ollaya_convert.families.llm_common.export_llama` (or `replay`, for another device): the
-//! family's Python reference prompt, run through the same pinned llama.cpp build's llama-server
-//! with the same fixed evaluation plan.
+//! Compare the llama.cpp engine (`winnow-v1`, `llm-logits-v1`, `jevk5-v1`) against golden
+//! fixtures from `ollaya_convert.families.llm_common.export_llama` (or `replay`, for another
+//! device): the family's Python reference prompt, run through the same pinned llama.cpp build's
+//! llama-server with the same fixed evaluation plan.
 //!
 //!     cargo run --release -p ollaya-runner --example parity_llama -- \
 //!         <model-dir> <goldens.jsonl> [auto|cpu|cuda|cuda:<n>] [--latency]
