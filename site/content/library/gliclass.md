@@ -11,7 +11,7 @@ Accuracy is the argmax against the majority label on all 400 typed-decisions sta
 ## Usage
 
 ```shell
-ollaya run gliclass --preset triage "I was charged twice for my subscription this month and want a refund."
+ollaya run gliclass --preset triage "Your app crashed during checkout and I was charged twice. Please refund one of the charges."
 ```
 
 ## How it works

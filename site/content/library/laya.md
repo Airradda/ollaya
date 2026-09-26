@@ -14,7 +14,7 @@ Each model carries an fp16 and an fp32 graph over one weights file. It loads fp1
 ## Usage
 
 ```shell
-ollaya run laya --preset triage "I was charged twice for my subscription this month and want a refund."
+ollaya run laya --preset triage "Your app crashed during checkout and I was charged twice. Please refund one of the charges."
 ```
 
 Or call the local API:

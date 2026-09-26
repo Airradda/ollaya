@@ -74,6 +74,9 @@ function Hero() {
               Browse models <Icon name="arrowRight" class="size-4" />
             </a>
           </div>
+          <p class="mt-6 text-xs text-muted">
+            An independent open-source project, not affiliated with Ollama or TypeSafe.
+          </p>
         </div>
         <TerminalMock />
       </div>

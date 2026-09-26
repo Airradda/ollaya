@@ -42,7 +42,7 @@ A model such as `laya:en` carries an fp16 and an fp32 graph that share one weigh
 ## ollaya run
 
 ```shell
-ollaya run laya --preset triage "I was charged twice for my subscription this month and want a refund."
+ollaya run laya --preset triage "Your app crashed during checkout and I was charged twice. Please refund one of the charges."
 ```
 
 `run` connects to the server (starting it if needed), pulls the model if it is not on this machine, loads it and prints one row per question: the answer, a bar and its probability.

@@ -29,15 +29,15 @@ The script downloads the latest release from GitHub and checks its sha256. On Li
 ## 2. Run a model
 
 ```shell
-ollaya run laya --preset triage "I was charged twice for my subscription this month and want a refund."
+ollaya run laya --preset triage "Your app crashed during checkout and I was charged twice. Please refund one of the charges."
 ```
 
 ```text
-intent            refund                                ████████████████ 1.00
-is_urgent         no                                    ██████████████░░ 0.88
-frustration       1.76 / 3  clearly annoyed             ██████░░░░░░░░░░ 0.36
-refund_requested  yes                                   ██████████████░░ 0.90
-churn_risk        no                                    ██████████░░░░░░ 0.61
+intent            refund                                ████████████████ 0.98
+is_urgent         no                                    ███████████████░ 0.93
+frustration       1.46 / 3  concerned but civil         ██████░░░░░░░░░░ 0.36
+refund_requested  yes                                   ████████████░░░░ 0.76
+churn_risk        no                                    ███████████████░ 0.92
 ```
 
 `ollaya run` starts the server if it isn't running, pulls the model on first use and loads it. `laya` is a router: it sends English text to `laya:en` and other languages, Turkish for example, to `laya:multilingual`. Pulling `laya` pulls both.

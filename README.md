@@ -25,15 +25,15 @@ changing one environment variable.
 
 ```sh
 curl -fsSL https://ollaya.dev/install.sh | sh
-ollaya run laya --preset triage "I was charged twice for my subscription this month and want a refund."
+ollaya run laya --preset triage "Your app crashed during checkout and I was charged twice. Please refund one of the charges."
 ```
 
 ```
-intent            refund       ████████████████ 1.00
-is_urgent         no           ██████████████░░ 0.88
-frustration       1.76 / 3     ██████░░░░░░░░░░ 0.36
-refund_requested  yes          ██████████████░░ 0.90
-churn_risk        no           ██████████░░░░░░ 0.61
+intent            refund                                ████████████████ 0.98
+is_urgent         no                                    ███████████████░ 0.93
+frustration       1.46 / 3  concerned but civil         ██████░░░░░░░░░░ 0.36
+refund_requested  yes                                   ████████████░░░░ 0.76
+churn_risk        no                                    ███████████████░ 0.92
 ```
 
 ## Features
@@ -145,3 +145,5 @@ contributors, on Qwen3.5), `qwen3guard` (Qwen team), `gliclass` (Knowledgator), 
 Panisa), `winnow` (EldanRing, on Gemma 4 by Google DeepMind), `jevk5` (alibiserikbay, on Qwen3.5)
 and `nli:modernbert-large` are Apache-2.0, and `nli:deberta-v3-large` (Moritz Laurer) is MIT. llama.cpp, which Ollaya ships for
 GGUF models, is MIT.
+
+Ollaya is an independent project. It is not affiliated with or endorsed by Ollama or TypeSafe.
