@@ -327,4 +327,28 @@ CATALOG = {
         "aliases": {"latest": "12b"},
         "parity": "PARITY-PENDING",
     },
+    "jevk5": {
+        "namespace": "library",
+        "model": "jevk5",
+        "family": "jevk5",
+        "author": "alibiserikbay",
+        "license": "Apache-2.0",
+        "license_text": "JevK5 by the JevK5 authors (https://github.com/allebee, https://huggingface.co/alibiserikbay), "
+                        "a fine-tune of Qwen3.5-4B by the Qwen team (Apache-2.0). Its decision prompt and one-pass "
+                        "readout are adapted from SemIf by TheoLeeCJ (MIT).\n"
+                        "Licensed under the Apache License, Version 2.0.\n\n" + LICENSE_APACHE,
+        "tags": {
+            # JevK5 v0.3 (4B), Q8_0: the file the author checked against bf16 (229 of 231 JevBench
+            # answers the same). The GGUF holds the weights, tokenizer and chat template.
+            "4b": _gguf("jevk5-4b-q8_0", "alibiserikbay/JevK5-GGUF", "ec67b0bfce5119a8b11a2cdb430bb43e3fa3e82a",
+                        "jevk5-4b-v0.3-Q8_0.gguf",
+                        "JevK5 v0.3 (Qwen3.5-4B fine-tune), Q8_0 GGUF on llama.cpp: the answer letters' logits "
+                        "after JevK5's own prompt, with the author's temperature 1.22. Up to 16 options.",
+                        "4B", ["en"]),
+        },
+        "aliases": {"latest": "4b"},
+        "parity": "Ollaya's runner matches stock llama-server of the pinned build (b11146) on the same GGUF, "
+                  "CUDA (RTX 4090): 593 questions, every decision the same, option logits within 7.7e-6 and "
+                  "probabilities within 1.6e-6. The prompts are byte-identical to the author's jevk5.prompt.",
+    },
 }

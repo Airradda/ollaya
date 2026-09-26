@@ -175,6 +175,20 @@ const overlays: Record<string, ModelOverlay> = {
       e4b: { summary: "Winnow-E4B, Q8_0 GGUF, with the author's fitted temperature: 0.722 on typed decisions, smaller and faster than 12b." },
     },
   },
+  jevk5: {
+    stats: { tag: 'jevk5:4b' },
+    title: 'JevK5',
+    description:
+      "Decision model by alibiserikbay, fine-tuned from Qwen3.5-4B and published as GGUF. JevK5 reads the answer letters' logits after its own JSON prompt; Ollaya runs the author's file on llama.cpp, on NVIDIA GPUs, Apple silicon or the CPU.",
+    publisher: { name: 'alibiserikbay', url: 'https://huggingface.co/alibiserikbay' },
+    capabilities: ['decision', 'fine-tuned', 'gguf'],
+    keywords: ['jevk5', 'qwen', 'qwen3.5', 'gguf', 'llama.cpp', 'llm', 'decision', 'classification', 'typesafe', 'jev', 'system one'],
+    rank: 9,
+    tags: {
+      latest: { summary: 'Same as jevk5:4b.' },
+      '4b': { summary: "JevK5 v0.3 (4B), Q8_0 GGUF, with the author's temperature 1.22; up to 16 options per question." },
+    },
+  },
   gliclass: {
     stats: { tag: 'gliclass:large', accuracy: 0.477, latencyMs: 14.7 },
     title: 'GLiClass',

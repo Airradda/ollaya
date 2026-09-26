@@ -35,6 +35,7 @@ Open decision models from these families. See [Models](/search).
 - **`qwen3guard`** from the Qwen team: a safety guard in 119 languages. It answers its own built-in questions (safe, controversial or unsafe, and the unsafe category), so you send it only the text.
 - **`von`** from Victor Hugo Panisa: Von 1.1 on ModernBERT-large, which scores every option at its own marker in one pass and reads states of up to 8,192 tokens.
 - **`winnow`** from EldanRing: Winnow-12B (`winnow`) and Winnow-E4B (`winnow:e4b`), Gemma 4 fine-tunes published as GGUF files. Ollaya runs the author's file on llama.cpp, on an NVIDIA GPU, Apple silicon's GPU or the CPU.
+- **`jevk5`** from alibiserikbay: JevK5 v0.3, a Qwen3.5-4B fine-tune published as GGUF files. Ollaya runs the author's 4B Q8_0 file on llama.cpp, with up to 16 options per question.
 
 ## Where do the weights come from?
 
@@ -94,4 +95,4 @@ For an install without root (in `~/.local`), delete `~/.local/bin/ollaya`, `~/.l
 
 ## What is the license?
 
-Ollaya is Apache-2.0. Models carry their own licenses: `laya`, `decider`, `kev`, `decision`, `qwen3guard`, `gliclass`, `von`, `winnow` and `nli:modernbert-large` are Apache-2.0, and `nli:deberta-v3-large` is MIT.
+Ollaya is Apache-2.0. Models carry their own licenses: `laya`, `decider`, `kev`, `decision`, `qwen3guard`, `gliclass`, `von`, `winnow`, `jevk5` and `nli:modernbert-large` are Apache-2.0, and `nli:deberta-v3-large` is MIT.

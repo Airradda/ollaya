@@ -50,7 +50,7 @@ churn_risk        no           ██████████░░░░░░ 
 - **Weights come from their authors.** Ollaya publishes only small ONNX graphs, about 3 MB each.
   These graphs read the original weight files (usually `model.safetensors`) from the author's
   Hugging Face repository, pinned to a commit and verified by sha256. Models whose authors publish
-  GGUF files (`winnow`) run that file itself on llama.cpp. Ollaya never re-hosts weights.
+  GGUF files (`winnow`, `jevk5`) run that file itself on llama.cpp. Ollaya never re-hosts weights.
 - **For agents.** `ollaya mcp` serves the models to Claude Code, Claude Desktop, Cursor and other
   MCP clients (`claude mcp add ollaya -- ollaya mcp`), and the
   [`ollaya-decisions` skill](skills/ollaya-decisions/SKILL.md) teaches agents when and how to use
@@ -87,6 +87,7 @@ churn_risk        no           ██████████░░░░░░ 
 | `gliclass` | Knowledgator's instruction-following zero-shot classifier (DeBERTa-v3-large) |
 | `von` | Victor Hugo Panisa's Von 1.1 (ModernBERT-large): every option scored at its own marker, 8k-token context |
 | `winnow`, `winnow:e4b` | EldanRing's Winnow-12B and Winnow-E4B, Gemma 4 fine-tunes run from the author's Q8_0 GGUF on llama.cpp |
+| `jevk5` | alibiserikbay's JevK5 v0.3, a Qwen3.5-4B fine-tune run from the author's Q8_0 GGUF on llama.cpp, up to 16 options |
 
 Browse them at [ollaya.dev/search](https://ollaya.dev/search). Laya tags ending in
 `-fp32` or `-fp16` pin the precision. The derived files of every model are also published at
@@ -141,6 +142,6 @@ MPS build from PyPI on Apple silicon Macs, where exports and parity run on the C
 Apache-2.0. Each model keeps its own license: `laya` (Convai Innovations), `decider` (Mapika),
 `kev` (Jared Palmer, on Qwen3.5 by the Qwen team), `decision` (the vLLM Semantic Router
 contributors, on Qwen3.5), `qwen3guard` (Qwen team), `gliclass` (Knowledgator), `von` (Victor Hugo
-Panisa), `winnow` (EldanRing, on Gemma 4 by Google DeepMind) and `nli:modernbert-large` are
-Apache-2.0, and `nli:deberta-v3-large` (Moritz Laurer) is MIT. llama.cpp, which Ollaya ships for
+Panisa), `winnow` (EldanRing, on Gemma 4 by Google DeepMind), `jevk5` (alibiserikbay, on Qwen3.5)
+and `nli:modernbert-large` are Apache-2.0, and `nli:deberta-v3-large` (Moritz Laurer) is MIT. llama.cpp, which Ollaya ships for
 GGUF models, is MIT.
