@@ -204,14 +204,15 @@ pub fn load(config: &RunnerConfig) -> Result<(Box<dyn Engine>, Loaded), Error> {
             Err(e) => return Err(e),
         }
     }
-    let gpu = match config.device {
+    let device = onnx_device(config.device, cfg!(feature = "cuda-dynamic"));
+    let gpu = match device {
         DeviceRequest::Cpu | DeviceRequest::Metal => None,
         DeviceRequest::Auto => Some(0),
         DeviceRequest::Cuda(id) => Some(id),
     };
     if let Some(id) = gpu {
         match cuda_providers_present() {
-            Err(why) if config.device == DeviceRequest::Auto => {
+            Err(why) if device == DeviceRequest::Auto => {
                 tracing::info!("GPU runtime not installed, using CPU: {why}");
             }
             Err(why) => return Err(Error::Model(why)),
@@ -228,7 +229,7 @@ pub fn load(config: &RunnerConfig) -> Result<(Box<dyn Engine>, Loaded), Error> {
                     // the CPU instead of failing every request.
                     Ok(model) => {
                         let warmed = warm_up(model.as_ref());
-                        match after_gpu_warm_up(&warmed, config.device) {
+                        match after_gpu_warm_up(&warmed, device) {
                             AfterWarmUp::FallBackToCpu => {
                                 if let Err(e) = warmed {
                                     tracing::warn!(
@@ -257,7 +258,7 @@ pub fn load(config: &RunnerConfig) -> Result<(Box<dyn Engine>, Loaded), Error> {
                             }
                         }
                     }
-                    Err(e) if config.device == DeviceRequest::Auto => {
+                    Err(e) if device == DeviceRequest::Auto => {
                         tracing::info!("CUDA unavailable, using CPU: {e}");
                     }
                     Err(e) => return Err(e),
@@ -316,6 +317,17 @@ fn cuda_providers_present() -> Result<(), String> {
             "no CUDA runtime in {} (install the GPU pack)",
             dir.display()
         ))
+    }
+}
+
+/// The device an ONNX model asks ONNX Runtime for. The GPU pack's runner (`cuda-dynamic`) turns
+/// `auto` into the first GPU: it never falls back to the CPU itself, because its ONNX Runtime is
+/// not the one CPU runners use. The daemon starts a CPU runner from the statically linked build
+/// when it fails (`ollaya_server::scheduler`).
+fn onnx_device(requested: DeviceRequest, gpu_runner: bool) -> DeviceRequest {
+    match requested {
+        DeviceRequest::Auto if gpu_runner => DeviceRequest::Cuda(0),
+        other => other,
     }
 }
 
@@ -518,6 +530,21 @@ mod tests {
         assert_eq!(
             after_gpu_warm_up(&other, DeviceRequest::Auto),
             AfterWarmUp::KeepGpu
+        );
+    }
+
+    #[test]
+    fn the_gpu_pack_runner_never_falls_back_to_the_cpu_itself() {
+        use super::{DeviceRequest, onnx_device};
+        assert_eq!(
+            onnx_device(DeviceRequest::Auto, true),
+            DeviceRequest::Cuda(0)
+        );
+        assert_eq!(onnx_device(DeviceRequest::Auto, false), DeviceRequest::Auto);
+        assert_eq!(onnx_device(DeviceRequest::Cpu, true), DeviceRequest::Cpu);
+        assert_eq!(
+            onnx_device(DeviceRequest::Cuda(1), true),
+            DeviceRequest::Cuda(1)
         );
     }
 

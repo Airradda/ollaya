@@ -6,7 +6,7 @@
 //! returns all of its memory, including GPU memory.
 
 use std::collections::{HashMap, VecDeque};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -45,6 +45,39 @@ pub struct SchedulerConfig {
     /// llama.cpp's libraries, which GGUF models run on (`launch::llama_dir`); `None` when this
     /// install has none.
     pub llama_dir: Option<PathBuf>,
+    /// The statically linked executable, when `exe` is the GPU pack's runner
+    /// (`launch::CUDA_RUNNER`): ONNX models that run on the CPU start from it, plainly.
+    pub cpu_exe: Option<PathBuf>,
+}
+
+/// Which runner an ONNX model starts from, given the configured device (see [`Scheduler::spawn`]).
+#[derive(Debug, PartialEq)]
+enum Plan {
+    /// `exe`, with `arg0` and `env`, and the configured device.
+    Configured,
+    /// `cpu_exe` with `--device cpu`.
+    Cpu,
+    /// `Configured`; if it fails to load, `Cpu`.
+    GpuThenCpu,
+}
+
+/// With a separate CPU executable, `cpu` runs there and `auto` tries the GPU runner first (which
+/// never falls back to the CPU itself, see `ollaya_runner::server`). GGUF models run on
+/// llama.cpp, not ONNX Runtime, and keep the configured runner.
+fn plan(device: &str, onnx: bool, has_cpu_exe: bool) -> Plan {
+    match (device, onnx && has_cpu_exe) {
+        ("cpu", true) => Plan::Cpu,
+        ("auto", true) => Plan::GpuThenCpu,
+        _ => Plan::Configured,
+    }
+}
+
+/// One way to start a runner.
+struct Launch<'a> {
+    exe: &'a Path,
+    arg0: Option<&'a Path>,
+    env: &'a [(String, String)],
+    device: &'a str,
 }
 
 /// The GGUF layouts this build's runner can run (`ollaya_runner::llama::LAYOUTS`).
@@ -368,7 +401,35 @@ impl Scheduler {
     }
 
     async fn spawn(&self, model: &Loadable) -> Result<Runner, Error> {
-        let mut cmd = Command::new(&self.config.exe);
+        let configured = Launch {
+            exe: &self.config.exe,
+            arg0: self.config.arg0.as_deref(),
+            env: &self.config.env,
+            device: &self.config.device,
+        };
+        let onnx = matches!(model.files, EngineFiles::Onnx(_));
+        let cpu_exe = self.config.cpu_exe.as_deref();
+        let cpu = cpu_exe.map(|exe| Launch {
+            exe,
+            arg0: None,
+            env: &[],
+            device: "cpu",
+        });
+        match (plan(&self.config.device, onnx, cpu_exe.is_some()), cpu) {
+            (Plan::Cpu, Some(cpu)) => self.spawn_with(model, &cpu).await,
+            (Plan::GpuThenCpu, Some(cpu)) => match self.spawn_with(model, &configured).await {
+                Ok(runner) => Ok(runner),
+                Err(e) => {
+                    tracing::warn!("{e}; loading it on the CPU");
+                    self.spawn_with(model, &cpu).await
+                }
+            },
+            _ => self.spawn_with(model, &configured).await,
+        }
+    }
+
+    async fn spawn_with(&self, model: &Loadable, launch: &Launch<'_>) -> Result<Runner, Error> {
+        let mut cmd = Command::new(launch.exe);
         cmd.arg("runner");
         match &model.files {
             EngineFiles::Onnx(f) => {
@@ -402,23 +463,23 @@ impl Scheduler {
                     .arg(dir);
             }
         }
-        cmd.arg("--device").arg(&self.config.device);
+        cmd.arg("--device").arg(launch.device);
         #[cfg(unix)]
-        if let Some(arg0) = &self.config.arg0 {
+        if let Some(arg0) = launch.arg0 {
             cmd.arg0(arg0);
         }
         // A runner is a console program; from a server without a console (the desktop app's, or
         // one the CLI started), Windows would open a window for each one.
         #[cfg(windows)]
         cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
-        cmd.envs(self.config.env.iter().map(|(k, v)| (k, v)))
+        cmd.envs(launch.env.iter().map(|(k, v)| (k, v)))
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .kill_on_drop(true);
         let mut child = cmd
             .spawn()
-            .map_err(|e| Error::LoadFailed(format!("spawn {}: {e}", self.config.exe.display())))?;
+            .map_err(|e| Error::LoadFailed(format!("spawn {}: {e}", launch.exe.display())))?;
         let stdout = child.stdout.take().expect("stdout is piped");
         let stderr = child.stderr.take().expect("stderr is piped");
 
@@ -496,3 +557,23 @@ impl Scheduler {
 
 /// Non-empty stderr lines of a runner kept to explain a failed load.
 const STDERR_TAIL: usize = 5;
+
+#[cfg(test)]
+mod tests {
+    use super::{Plan, plan};
+
+    #[test]
+    fn onnx_models_on_the_cpu_start_from_the_static_build() {
+        // A GPU pack with its own ONNX Runtime: CPU runners keep today's build.
+        assert_eq!(plan("cpu", true, true), Plan::Cpu);
+        assert_eq!(plan("auto", true, true), Plan::GpuThenCpu);
+        assert_eq!(plan("cuda", true, true), Plan::Configured);
+        assert_eq!(plan("cuda:1", true, true), Plan::Configured);
+        // GGUF models run on llama.cpp and keep the configured runner.
+        assert_eq!(plan("cpu", false, true), Plan::Configured);
+        assert_eq!(plan("auto", false, true), Plan::Configured);
+        // Without a separate CPU executable, nothing changes.
+        assert_eq!(plan("cpu", true, false), Plan::Configured);
+        assert_eq!(plan("auto", true, false), Plan::Configured);
+    }
+}

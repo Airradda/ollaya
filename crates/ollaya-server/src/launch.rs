@@ -17,7 +17,8 @@
 //! ([`ORT_LIBRARY`]). Its runners start from a second build of this executable, [`CUDA_RUNNER`],
 //! which loads that library at run time (`ORT_DYLIB_PATH`), so its runtime path is the pack. The
 //! statically linked executable never loads such a pack's providers: they belong to another
-//! ONNX Runtime build.
+//! ONNX Runtime build. CPU runners keep starting from the statically linked executable
+//! ([`RunnerLaunch::cpu_exe`]), so CPU numbers do not depend on whether the pack is installed.
 //!
 //! See `docs/distribution.md`, "The runtime library contract".
 
@@ -66,6 +67,9 @@ pub struct RunnerLaunch {
     pub env: Vec<(String, String)>,
     /// llama.cpp's libraries, for GGUF models (see [`llama_dir`]).
     pub llama_dir: Option<PathBuf>,
+    /// Where ONNX models start when they run on the CPU, if not from `exe`: the statically linked
+    /// executable, with no `argv[0]` or environment changes, when `exe` is [`CUDA_RUNNER`].
+    pub cpu_exe: Option<PathBuf>,
 }
 
 impl RunnerLaunch {
@@ -85,6 +89,7 @@ impl RunnerLaunch {
             arg0: None,
             env: Vec::new(),
             llama_dir: None,
+            cpu_exe: None,
         }
     }
 }
@@ -190,18 +195,19 @@ fn gpu_launch(exe: &Path, dir: &Path) -> std::io::Result<RunnerLaunch> {
         ld.push_str(&old);
     }
     let mut env = vec![("LD_LIBRARY_PATH".into(), ld)];
-    let exe = match dynamic_runner(dir)? {
+    let (runner, cpu_exe) = match dynamic_runner(dir)? {
         Some((runner, library)) => {
             env.push(("ORT_DYLIB_PATH".into(), library));
-            runner
+            (runner, Some(exe.to_path_buf()))
         }
-        None => exe.to_path_buf(),
+        None => (exe.to_path_buf(), None),
     };
     Ok(RunnerLaunch {
-        exe,
+        exe: runner,
         arg0: Some(dir.join("ollaya")),
         env,
         llama_dir: None,
+        cpu_exe,
     })
 }
 
@@ -212,14 +218,19 @@ fn gpu_launch(exe: &Path, dir: &Path) -> std::io::Result<RunnerLaunch> {
     if exe.parent().is_some_and(|p| resolve(p) == dir) {
         return Ok(RunnerLaunch::plain(exe));
     }
-    let (source, env) = match dynamic_runner(dir)? {
-        Some((runner, library)) => (runner, vec![("ORT_DYLIB_PATH".into(), library)]),
-        None => (exe.to_path_buf(), Vec::new()),
+    let (source, env, cpu_exe) = match dynamic_runner(dir)? {
+        Some((runner, library)) => (
+            runner,
+            vec![("ORT_DYLIB_PATH".into(), library)],
+            Some(exe.to_path_buf()),
+        ),
+        None => (exe.to_path_buf(), Vec::new(), None),
     };
     let runner = runner_copy(&source, dir)?;
     tracing::debug!("GPU runners start from {}", runner.display());
     Ok(RunnerLaunch {
         env,
+        cpu_exe,
         ..RunnerLaunch::plain(&runner)
     })
 }
@@ -374,6 +385,7 @@ mod tests {
         assert_eq!(key, "LD_LIBRARY_PATH");
         assert!(value.starts_with(&dir.display().to_string()));
         assert_eq!(launch.env.len(), 1);
+        assert_eq!(launch.cpu_exe, None);
     }
 
     #[test]
@@ -399,12 +411,15 @@ mod tests {
         let launch = runner_launch(&exe);
         assert_eq!(launch.exe, exe);
         assert!(launch.env.is_empty());
+        assert_eq!(launch.cpu_exe, None);
 
         let runner = root.path().join("lib/ollaya").join(CUDA_RUNNER);
         std::fs::write(&runner, b"cuda runner").unwrap();
         let launch = runner_launch(&exe);
         assert_eq!(launch.exe, resolve(&runner));
         assert_eq!(launch.arg0, Some(dir.join("ollaya")));
+        // CPU runners stay on the statically linked build.
+        assert_eq!(launch.cpu_exe, Some(exe.clone()));
         let env: std::collections::HashMap<_, _> = launch.env.into_iter().collect();
         assert!(env["LD_LIBRARY_PATH"].starts_with(&dir.display().to_string()));
         assert_eq!(

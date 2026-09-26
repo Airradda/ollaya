@@ -839,6 +839,7 @@ pub fn build(config: ServerConfig, runner: RunnerLaunch) -> Result<Arc<AppState>
         arg0: runner.arg0,
         env: runner.env,
         llama_dir: runner.llama_dir,
+        cpu_exe: runner.cpu_exe,
     });
     let ollaya = Ollaya::new(store, scheduler)?;
     Ok(AppState::new(ollaya, config))
