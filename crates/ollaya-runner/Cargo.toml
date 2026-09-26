@@ -13,6 +13,10 @@ default = []
 # Linux, the same plus DirectML on Windows. Asking for these features selects it. Only the CUDA
 # provider is registered at runtime.
 cuda = ["ort/cuda", "ort/tensorrt", "ort/nvrtx"]
+# The GPU pack's runner: loads Microsoft's ONNX Runtime GPU build (libonnxruntime and its CUDA
+# provider, which ship in the pack) at run time instead of linking pyke's build, whose CUDA
+# kernels stop at sm_90. See docs/decisions/0004-cuda-onnxruntime-builds.md.
+cuda-dynamic = ["cuda", "ort/load-dynamic"]
 # Links pyke's macOS build (which includes the Core ML provider). Models run on the CPU provider
 # until the Core ML path is measured against CPU and verified for parity.
 coreml = ["ort/coreml"]

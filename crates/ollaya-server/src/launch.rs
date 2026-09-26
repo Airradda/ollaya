@@ -12,6 +12,13 @@
 //!   directory the runner's application directory, which Windows searches first for every DLL
 //!   the provider loads, so no `PATH` change is needed.
 //!
+//! A pack built from Microsoft's ONNX Runtime GPU release (see
+//! `docs/decisions/0004-cuda-onnxruntime-builds.md`) also holds ONNX Runtime itself
+//! ([`ORT_LIBRARY`]). Its runners start from a second build of this executable, [`CUDA_RUNNER`],
+//! which loads that library at run time (`ORT_DYLIB_PATH`), so its runtime path is the pack. The
+//! statically linked executable never loads such a pack's providers: they belong to another
+//! ONNX Runtime build.
+//!
 //! See `docs/distribution.md`, "The runtime library contract".
 
 use std::io::Read as _;
@@ -30,6 +37,23 @@ pub const CUDA_PROVIDERS: [&str; 2] = [
     "libonnxruntime_providers_shared.so",
     "libonnxruntime_providers_cuda.so",
 ];
+
+/// ONNX Runtime itself, in a pack built from Microsoft's GPU release.
+#[cfg(windows)]
+pub const ORT_LIBRARY: &str = "onnxruntime.dll";
+#[cfg(not(windows))]
+pub const ORT_LIBRARY: &str = "libonnxruntime.so.1";
+
+/// The executable GPU runners start from when the pack holds [`ORT_LIBRARY`]: ollaya built with
+/// `ollaya-runner/cuda-dynamic`, next to the pack directory (`lib/ollaya/`).
+#[cfg(windows)]
+pub const CUDA_RUNNER: &str = "ollaya-cuda-runner.exe";
+#[cfg(not(windows))]
+pub const CUDA_RUNNER: &str = "ollaya-cuda-runner";
+
+/// The pack directories, in order of preference: CUDA 13, then CUDA 12 (for drivers older than
+/// R580). An install has at most one of them.
+pub const CUDA_PACKS: [&str; 2] = ["cuda_v13", "cuda_v12"];
 
 /// How runner processes are started.
 #[derive(Debug, Clone)]
@@ -67,22 +91,40 @@ impl RunnerLaunch {
 
 /// Directory holding the CUDA runtime pack, if this install has one.
 ///
-/// First match wins: `$OLLAYA_LIBRARY_PATH/cuda_v13`, `<exe dir>/../lib/ollaya/cuda_v13` (the
-/// archive and Docker layouts), then the executable's own directory for development builds,
-/// where `copy-dylibs` places the providers next to the binary.
+/// First match wins: `$OLLAYA_LIBRARY_PATH/<pack>`, `<exe dir>/../lib/ollaya/<pack>` (the
+/// archive and Docker layouts), each pack of [`CUDA_PACKS`] in turn, then the executable's own
+/// directory for development builds, where `copy-dylibs` places the providers next to the binary.
 pub fn cuda_dir(exe: &Path) -> Option<PathBuf> {
     let has_providers = |d: &Path| CUDA_PROVIDERS.iter().all(|p| d.join(p).is_file());
     let exe_dir = exe.parent()?;
-    let candidates = [
-        std::env::var_os("OLLAYA_LIBRARY_PATH").map(|p| PathBuf::from(p).join("cuda_v13")),
-        Some(exe_dir.join("../lib/ollaya/cuda_v13")),
-        Some(exe_dir.to_path_buf()),
-    ];
-    candidates
-        .into_iter()
+    let library_path = std::env::var_os("OLLAYA_LIBRARY_PATH").map(PathBuf::from);
+    let roots = [library_path, Some(exe_dir.join("../lib/ollaya"))];
+    roots
+        .iter()
         .flatten()
+        .flat_map(|root| CUDA_PACKS.map(|pack| root.join(pack)))
+        .chain(std::iter::once(exe_dir.to_path_buf()))
         .find(|d| has_providers(d))
         .map(|d| resolve(&d))
+}
+
+/// For a pack that holds its own ONNX Runtime: the runner executable and the library it loads.
+/// `None` for a pack of provider libraries only, which the statically linked executable loads.
+fn dynamic_runner(dir: &Path) -> std::io::Result<Option<(PathBuf, String)>> {
+    let library = dir.join(ORT_LIBRARY);
+    if !library.is_file() {
+        return Ok(None);
+    }
+    let runner = dir
+        .parent()
+        .map(|p| p.join(CUDA_RUNNER))
+        .filter(|r| r.is_file())
+        .ok_or_else(|| {
+            std::io::Error::other(format!(
+                "the GPU pack needs {CUDA_RUNNER} next to it; reinstall ollaya"
+            ))
+        })?;
+    Ok(Some((resolve(&runner), library.display().to_string())))
 }
 
 /// `d` as an absolute path without `..`. Windows keeps the plain drive form: a canonical path
@@ -147,10 +189,18 @@ fn gpu_launch(exe: &Path, dir: &Path) -> std::io::Result<RunnerLaunch> {
         ld.push(':');
         ld.push_str(&old);
     }
+    let mut env = vec![("LD_LIBRARY_PATH".into(), ld)];
+    let exe = match dynamic_runner(dir)? {
+        Some((runner, library)) => {
+            env.push(("ORT_DYLIB_PATH".into(), library));
+            runner
+        }
+        None => exe.to_path_buf(),
+    };
     Ok(RunnerLaunch {
-        exe: exe.to_path_buf(),
+        exe,
         arg0: Some(dir.join("ollaya")),
-        env: vec![("LD_LIBRARY_PATH".into(), ld)],
+        env,
         llama_dir: None,
     })
 }
@@ -162,9 +212,16 @@ fn gpu_launch(exe: &Path, dir: &Path) -> std::io::Result<RunnerLaunch> {
     if exe.parent().is_some_and(|p| resolve(p) == dir) {
         return Ok(RunnerLaunch::plain(exe));
     }
-    let runner = runner_copy(exe, dir)?;
+    let (source, env) = match dynamic_runner(dir)? {
+        Some((runner, library)) => (runner, vec![("ORT_DYLIB_PATH".into(), library)]),
+        None => (exe.to_path_buf(), Vec::new()),
+    };
+    let runner = runner_copy(&source, dir)?;
     tracing::debug!("GPU runners start from {}", runner.display());
-    Ok(RunnerLaunch::plain(&runner))
+    Ok(RunnerLaunch {
+        env,
+        ..RunnerLaunch::plain(&runner)
+    })
 }
 
 /// A copy of the executable `exe` in `dir`, for runners whose runtime path must be `dir`: on
@@ -316,5 +373,43 @@ mod tests {
         let (key, value) = &launch.env[0];
         assert_eq!(key, "LD_LIBRARY_PATH");
         assert!(value.starts_with(&dir.display().to_string()));
+        assert_eq!(launch.env.len(), 1);
+    }
+
+    #[test]
+    fn finds_a_cuda_12_pack() {
+        let root = tempfile::tempdir().unwrap();
+        let exe = install(root.path());
+        let lib = root.path().join("lib/ollaya/cuda_v12");
+        pack(&lib);
+        assert_eq!(cuda_dir(&exe), Some(resolve(&lib)));
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn a_pack_with_its_own_onnx_runtime_starts_the_cuda_runner() {
+        let root = tempfile::tempdir().unwrap();
+        let exe = install(root.path());
+        let lib = root.path().join("lib/ollaya/cuda_v12");
+        pack(&lib);
+        std::fs::write(lib.join(ORT_LIBRARY), b"ort").unwrap();
+        let dir = resolve(&lib);
+
+        // Without its runner, the pack is not used: the static build must not load its providers.
+        let launch = runner_launch(&exe);
+        assert_eq!(launch.exe, exe);
+        assert!(launch.env.is_empty());
+
+        let runner = root.path().join("lib/ollaya").join(CUDA_RUNNER);
+        std::fs::write(&runner, b"cuda runner").unwrap();
+        let launch = runner_launch(&exe);
+        assert_eq!(launch.exe, resolve(&runner));
+        assert_eq!(launch.arg0, Some(dir.join("ollaya")));
+        let env: std::collections::HashMap<_, _> = launch.env.into_iter().collect();
+        assert!(env["LD_LIBRARY_PATH"].starts_with(&dir.display().to_string()));
+        assert_eq!(
+            env["ORT_DYLIB_PATH"],
+            dir.join(ORT_LIBRARY).display().to_string()
+        );
     }
 }
