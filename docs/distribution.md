@@ -62,7 +62,7 @@ releases before 0.4.0, which have no such file, they download the archive as bef
 
 | File | Source | Loaded for Laya |
 |---|---|---|
-| `libonnxruntime_providers_shared.so`, `libonnxruntime_providers_cuda.so` | pyke's ORT 1.28 `cuda13,tensorrt,nvrtx` build (copied from `target/release` by `copy-dylibs`) | yes |
+| `libonnxruntime.so.1`, `libonnxruntime_providers_shared.so`, `libonnxruntime_providers_cuda.so` | Microsoft's `onnxruntime-linux-x64-gpu_cuda13-1.28.2.tgz`, unmodified (`docs/decisions/0004-cuda-onnxruntime-builds.md`) | yes |
 | `libcudart.so.13` | `nvidia-cuda-runtime==13.4.92` | yes |
 | `libcublas.so.13`, `libcublasLt.so.13` | `nvidia-cublas==13.8.0.4` | yes |
 | `libcurand.so.10` | `nvidia-curand==10.4.4.72` | yes |
@@ -95,8 +95,7 @@ releases before 0.4.0, which have no such file, they download the archive as bef
 
 | File | Source |
 |---|---|
-| `onnxruntime_providers_shared.dll`, `onnxruntime_providers_cuda.dll` | pyke's ORT 1.28 `cuda13,tensorrt,nvrtx,directml` build (`copy-dylibs`) |
-| `DirectML.dll` | the same build; the same file as `bin/DirectML.dll` |
+| `onnxruntime.dll`, `onnxruntime_providers_shared.dll`, `onnxruntime_providers_cuda.dll` | Microsoft's `onnxruntime-win-x64-gpu_cuda13-1.28.2.zip`, unmodified |
 | `cudart64_13.dll` | `nvidia-cuda-runtime==13.4.92` |
 | `cublas64_13.dll`, `cublasLt64_13.dll` | `nvidia-cublas==13.8.0.4` |
 | `curand64_10.dll` | `nvidia-curand==10.4.4.72` |
@@ -119,9 +118,9 @@ releases before 0.4.0, which have no such file, they download the archive as bef
   `cudnn64_9.dll` and `cudnn_graph64_9.dll` (the runner process's module list). Everything else it
   loaded came from the driver (`nvcuda.dll` and its `DriverStore` libraries).
 - **DirectML.dll.** `ollaya.exe` imports it (by ordinal), because pyke's Windows builds include the
-  DirectML provider, which is compiled in but never registered. The base zip has it in `bin/`, and
-  the pack has a copy: GPU runners start from inside the pack and load the DLLs they import from
-  their own folder, and without the copy they would pick up whatever version `System32` has.
+  DirectML provider, which is compiled in but never registered. The base zip has it in `bin/`. The
+  pack no longer carries a copy: GPU runners start from `ollaya-cuda-runner.exe`, which links no
+  ONNX Runtime and so imports no DirectML.
 
 ### llama.cpp (GGUF models)
 
@@ -264,6 +263,19 @@ dependencies through `LD_LIBRARY_PATH`. The provider has no RUNPATH:
 - **macOS.** Nothing to do: the CoreML EP is part of the static library.
 - **Docker.** The same rules apply. The binary is `/usr/bin/ollaya` and the libraries are in
   `/usr/lib/ollaya/cuda_v13`.
+
+### The GPU runner (`lib/ollaya/ollaya-cuda-runner`)
+
+Since ADR 0004 the pack holds Microsoft's ONNX Runtime GPU build, library and providers together,
+because pyke's CUDA build has no kernels for sm_120. Its providers belong to that library and must
+not be loaded by the ORT linked into `bin/ollaya`. So GPU runners start from
+`lib/ollaya/ollaya-cuda-runner`: the same program built with `ollaya-runner/cuda-dynamic` (`ort`'s
+`load-dynamic`), with `ORT_DYLIB_PATH=<pack>/libonnxruntime.so.1`. ORT is then a shared library,
+so `GetRuntimePath()` is the pack itself (see above). `argv[0]` and `LD_LIBRARY_PATH` are set as
+before. On Windows the runner copy inside the pack is made from `ollaya-cuda-runner.exe`, with
+`ORT_DYLIB_PATH=<pack>\onnxruntime.dll`. A pack that holds ONNX Runtime but has no runner next to
+it is not used. The runner is in the base archive, not the pack, so the pack's `FILES.sha256`
+still changes only when a library changes.
 
 ### On Windows
 
