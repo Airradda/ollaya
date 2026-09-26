@@ -1,8 +1,8 @@
 # 0004: Which ONNX Runtime build the GPU pack runs
 
-- Status: proposed, 2026-09-26 (issue #10)
-- Applies to: the CUDA pack (`lib/ollaya/cuda_v13`, `cuda_v12`), `ollaya-cuda-runner`, the `:cuda`
-  image. The CPU build and the macOS builds are unchanged.
+- Status: accepted, 2026-09-26 (issue #10)
+- Applies to: the CUDA pack (`lib/ollaya/cuda_v13`), `ollaya-cuda-runner`, the `:cuda` image. The
+  CPU build and the macOS builds are unchanged, and CPU runners keep using the CPU build.
 
 ## Context
 
@@ -96,9 +96,16 @@ Option 2, with the smallest change to what ships:
   `LD_LIBRARY_PATH` stay as they are; on Windows the runner copy inside the pack is made from
   `ollaya-cuda-runner.exe`. A pack with ONNX Runtime but no runner is not used, so the static
   build never loads another build's providers.
-- A CUDA 12 pack (`lib/ollaya/cuda_v12`, Microsoft's cuda12 build with CUDA 12.8 and cuDNN 9 for
+- ONNX models on the CPU keep starting from `bin/ollaya` (pyke's ORT), with or without the pack:
+  `OLLAYA_DEVICE=cpu` starts them there, and with `auto` the daemon starts the GPU runner and,
+  if it fails to load, a CPU runner from `bin/ollaya`. The GPU runner treats `auto` as the first
+  GPU and never falls back to the CPU inside its own process. CPU numbers are the same as before
+  this change. GGUF models run on llama.cpp and keep the GPU runner, as before.
+- **Deferred to the next release:** a CUDA 12 pack (`lib/ollaya/cuda_v12`, Microsoft's cuda12 build with CUDA 12.8 and cuDNN 9 for
   CUDA 12 from NVIDIA's wheels) for drivers older than R580. The daemon already looks for it after
-  `cuda_v13`; the installers pick one pack by the driver's CUDA version.
+  `cuda_v13`, but this release ships only the CUDA 13 pack (sm_120 included). Still needed: pinned
+  CUDA 12 wheels, `package.sh` staging, llama.cpp's CUDA 12 backend, and the installers picking
+  one pack by the driver's CUDA version.
 - Microsoft's version moves with `ort`: when `ort` moves to ONNX Runtime 1.x, the GPU pack moves
   to Microsoft's 1.x release, and both CPU and CUDA parity run again (PROJECT_NOTES: ORT changes
   only in a dedicated change).
@@ -108,9 +115,9 @@ Option 2, with the smallest change to what ships:
 - RTX 50-series GPUs get native SASS for most kernels and PTX for the rest. Not verified on an
   sm_120 GPU here: the evidence is the SASS/PTX list and parity on sm_89. The reporter of #10
   offered to test a build.
-- With the pack installed, all runners (CPU ones too) come from `ollaya-cuda-runner`, so CPU
-  inference there runs Microsoft's 1.28.2 CPU provider rather than pyke's 1.28.0. CPU parity must
-  pass on both (see the report for the run).
+- With the pack installed, GPU runners run Microsoft's 1.28.2 and CPU runners pyke's 1.28.0, as
+  without it. A GPU that fails to load under `auto` costs one extra runner start before the CPU
+  runner.
 - The base archive grows by one executable on x86-64 Linux and Windows. The CUDA 13 pack's ORT
   part shrinks or grows with Microsoft's build (provider 280 MB); the CUDA 12 pack is larger
   (provider 621 MB, cuBLAS 12).

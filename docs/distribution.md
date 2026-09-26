@@ -277,6 +277,14 @@ before. On Windows the runner copy inside the pack is made from `ollaya-cuda-run
 it is not used. The runner is in the base archive, not the pack, so the pack's `FILES.sha256`
 still changes only when a library changes.
 
+ONNX models on the CPU still start from `bin/ollaya`, plainly (no `argv[0]` or environment
+changes), so CPU numbers do not depend on the pack: `OLLAYA_DEVICE=cpu` starts them there, and
+with `auto` the daemon tries the GPU runner and, if it fails to load, starts a CPU runner from
+`bin/ollaya`. The GPU runner itself treats `auto` as the first GPU and never falls back to the CPU.
+
+The daemon also looks for `lib/ollaya/cuda_v12` after `cuda_v13`, but releases ship only the CUDA 13
+pack for now; a CUDA 12 pack (Microsoft's cuda12 build) is planned for a later release.
+
 ### On Windows
 
 The pack has the same layout, `lib\ollaya\cuda_v13` next to `bin\ollaya.exe`, but ORT finds its
