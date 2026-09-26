@@ -176,7 +176,7 @@ const overlays: Record<string, ModelOverlay> = {
     },
   },
   jevk5: {
-    stats: { tag: 'jevk5:4b' },
+    stats: { tag: 'jevk5:4b', accuracy: 0.625 },
     title: 'JevK5',
     description:
       "Decision model by alibiserikbay, fine-tuned from Qwen3.5-4B and published as GGUF. JevK5 reads the answer letters' logits after its own JSON prompt; Ollaya runs the author's file on llama.cpp, on NVIDIA GPUs, Apple silicon or the CPU.",
@@ -186,7 +186,7 @@ const overlays: Record<string, ModelOverlay> = {
     rank: 9,
     tags: {
       latest: { summary: 'Same as jevk5:4b.' },
-      '4b': { summary: "JevK5 v0.3 (4B), Q8_0 GGUF, with the author's temperature 1.22; up to 16 options per question." },
+      '4b': { summary: "JevK5 v0.3 (4B), Q8_0 GGUF, with the author's temperature 1.22: 0.625 on typed decisions; up to 16 options per question." },
     },
   },
   gliclass: {

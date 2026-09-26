@@ -8,7 +8,7 @@ JevK5 is an open decision model by alibiserikbay, fine-tuned from Qwen3.5-4B and
 |---|---|---|---|
 | `jevk5:latest`, `jevk5:4b` | Qwen3.5-4B, JevK5 v0.3 | Q8_0 GGUF, 4.5 GB | easy 1.000, standard 0.944, hard 0.784 |
 
-The accuracies are the author's, from the [JevK5-GGUF card](https://huggingface.co/alibiserikbay/JevK5-GGUF): the Q8_0 file gives the same answer as the bf16 model on 229 of the 231 public JevBench items, with the same per-tier accuracy. They are the author's own runs, not official JevBench results.
+The accuracies are the author's, from the [JevK5-GGUF card](https://huggingface.co/alibiserikbay/JevK5-GGUF): the Q8_0 file gives the same answer as the bf16 model on 229 of the 231 public JevBench items, with the same per-tier accuracy. They are the author's own runs, not official JevBench results. On typed-decisions (all 400 states, 2,000 questions, argmax against the majority label), measured by Ollaya, `jevk5:4b` scores 0.625, with a calibration error (ECE) of 0.093 at the shipped temperature.
 
 ## Usage
 

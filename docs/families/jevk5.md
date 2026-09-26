@@ -108,8 +108,10 @@ cases, and the extra cases of `export_llama.py`; 4 are rejected by both, 593 que
   state (35,073 tokens, beyond the context).
 - **Latency (measured here, in the runner without HTTP, five questions, short state).** RTX 4090:
   288 ms at the median (one cold pass per question).
-- **Not run.** The CPU, Metal, Windows, typed-decisions quality and a comparison with the author's
-  transformers runtime (bf16).
+- **Typed-decisions (measured here).** All 400 states, 2,000 questions, argmax against the majority
+  label: 0.625 (choice 0.568, score 0.576, noul 0.747), ECE 0.093 at the shipped T 1.22 (0.133 at T 1).
+- **Not run.** Metal, Windows and a comparison with the author's transformers runtime (bf16). CPU
+  parity was queued when this was written.
 
 Published numbers (JevK5-GGUF card, the author's runs on JevBench's 231 public items, not official
 JevBench results): the Q8_0 file gives the same answer as bf16 on 229 of 231, with tier accuracies
