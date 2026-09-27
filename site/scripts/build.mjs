@@ -36,6 +36,27 @@ function resolveOrigin(value) {
   }
 }
 
+// The repository's star count for the header, read from GitHub's API at build time (the site has no
+// client-side requests to other origins). An offline or rate-limited build shows the link without it.
+async function githubStars() {
+  try {
+    const res = await fetch('https://api.github.com/repos/ollaya-dev/ollaya', {
+      headers: {
+        Accept: 'application/vnd.github+json',
+        ...(process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}),
+      },
+      signal: AbortSignal.timeout(5000),
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const n = (await res.json()).stargazers_count
+    if (!Number.isInteger(n)) throw new Error('no stargazers_count')
+    return n
+  } catch (e) {
+    console.warn(`build: GitHub star count unavailable (${e.message}); the header shows none`)
+    return undefined
+  }
+}
+
 async function listFiles(dir) {
   const out = []
   for (const e of await readdir(dir, { withFileTypes: true })) {
@@ -94,7 +115,7 @@ await build({
   logLevel: 'warning',
 })
 const { renderSite } = await import(`${pathToFileURL(bundle).href}?t=${Date.now()}`)
-const files = await renderSite({ origin, assetVersions })
+const files = await renderSite({ origin, assetVersions, stars: await githubStars() })
 
 for (const f of files) {
   const target = join(dist, f.path)

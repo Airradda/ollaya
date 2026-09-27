@@ -19,6 +19,7 @@ import { Layout, type PageMeta } from './components/Layout'
 import { catalog, fullName, searchIndex } from './data/catalog'
 import { docPages } from './generated/content'
 import { hasAsset, setAssetVersions } from './lib/assets'
+import { setGithubStars } from './lib/stars'
 import { DocsIndex, DocView, withOrigin } from './pages/docs'
 import { DownloadPage } from './pages/download'
 import { HomePage } from './pages/home'
@@ -32,6 +33,8 @@ export interface BuildOptions {
   origin: string
   /** Content hashes of files in dist/static (for ?v= cache busting). */
   assetVersions: Record<string, string>
+  /** The GitHub repository's stars at build time, shown in the header; undefined offline. */
+  stars?: number
 }
 
 export interface OutputFile {
@@ -132,8 +135,9 @@ async function toHtml(node: Child): Promise<string> {
   return `<!DOCTYPE html>${await (await (node as Promise<string> | string)).toString()}`
 }
 
-export async function renderSite({ origin, assetVersions }: BuildOptions): Promise<OutputFile[]> {
+export async function renderSite({ origin, assetVersions, stars }: BuildOptions): Promise<OutputFile[]> {
   setAssetVersions(assetVersions)
+  setGithubStars(stars)
   const out: OutputFile[] = []
   const all = pages(origin)
 

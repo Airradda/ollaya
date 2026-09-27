@@ -1,3 +1,4 @@
+import { githubStars } from '../lib/stars'
 import { GITHUB_URL } from '../site'
 import { Icon } from './Icon'
 import { Logo } from './Logo'
@@ -9,6 +10,21 @@ const links: { key: NavKey | 'github'; href: string; label: string }[] = [
   { key: 'docs', href: '/docs', label: 'Docs' },
   { key: 'github', href: GITHUB_URL, label: 'GitHub' },
 ]
+
+/** The GitHub link with the star count the build read, e.g. "GitHub ☆ 495". */
+function GithubLabel({ label }: { label: string }) {
+  const stars = githubStars()
+  if (!stars) return <>{label}</>
+  return (
+    <span class="inline-flex items-center gap-1.5">
+      {label}
+      <span class="inline-flex items-center gap-0.5 text-muted tabular-nums" aria-label={`${stars} stars`}>
+        <Icon name="star" class="size-3.5 -translate-y-px" />
+        {stars}
+      </span>
+    </span>
+  )
+}
 
 function NavSearch() {
   return (
@@ -82,7 +98,7 @@ function MobileMenu() {
           {links.map((l) => (
             <li>
               <a href={l.href} class="block py-2 hover:underline underline-offset-4">
-                {l.label}
+                {l.key === 'github' ? <GithubLabel label={l.label} /> : l.label}
               </a>
             </li>
           ))}
@@ -113,7 +129,7 @@ export function Header({ active, hideSearch }: { active?: NavKey; hideSearch?: b
                   class={`underline-offset-4 hover:text-fg hover:underline ${active === l.key ? 'font-medium text-fg' : 'text-body'}`}
                   aria-current={active === l.key ? 'page' : undefined}
                 >
-                  {l.label}
+                  {l.key === 'github' ? <GithubLabel label={l.label} /> : l.label}
                 </a>
               </li>
             ))}
