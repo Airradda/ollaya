@@ -112,9 +112,9 @@ Option 2, with the smallest change to what ships:
 
 ## Consequences
 
-- RTX 50-series GPUs get native SASS for most kernels and PTX for the rest. Not verified on an
-  sm_120 GPU here: the evidence is the SASS/PTX list and parity on sm_89. The reporter of #10
-  offered to test a build.
+- RTX 50-series GPUs get native SASS for most kernels and PTX for the rest. Parity was measured
+  on sm_89 only; the reporter of #10 confirmed on 2026-09-26 that 0.7.2 runs on their RTX 5090
+  (sm_120).
 - With the pack installed, GPU runners run Microsoft's 1.28.2 and CPU runners pyke's 1.28.0, as
   without it. A GPU that fails to load under `auto` costs one extra runner start before the CPU
   runner.
