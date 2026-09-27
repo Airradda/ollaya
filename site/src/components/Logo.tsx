@@ -39,7 +39,7 @@ export function LogoMark({ class: cls = 'size-8', label }: { class?: string; lab
  */
 export function Logo() {
   return (
-    <span class="flex items-baseline gap-2 text-fg">
+    <span class="flex shrink-0 items-baseline gap-2 whitespace-nowrap text-fg">
       {/* The owl sits 5px inside its 28px box; pull it out so its edge lines up with the page. */}
       <LogoMark class="-ml-[5px] size-7 self-center" />
       <span class="text-lg leading-7 font-medium tracking-tight">

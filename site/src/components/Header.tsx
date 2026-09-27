@@ -11,18 +11,31 @@ const links: { key: NavKey | 'github'; href: string; label: string }[] = [
   { key: 'github', href: GITHUB_URL, label: 'GitHub' },
 ]
 
-/** The GitHub link with the star count the build read, e.g. "GitHub ☆ 495". */
+/** The GitHub link's label with the star count the build read, e.g. "GitHub ☆ 510". */
 function GithubLabel({ label }: { label: string }) {
   const stars = githubStars()
   if (!stars) return <>{label}</>
   return (
     <span class="inline-flex items-center gap-1.5">
       {label}
-      <span class="inline-flex items-center gap-0.5 text-muted tabular-nums" aria-label={`${stars} stars`}>
+      <span class="inline-flex items-center gap-0.5 text-muted tabular-nums">
         <Icon name="star" class="size-3.5 -translate-y-px" />
         {stars}
+        <span class="sr-only"> stars</span>
       </span>
     </span>
+  )
+}
+
+/** From lg up, GitHub and its stars sit on the right as a pill, where there is room for them. */
+function GithubPill() {
+  return (
+    <a
+      href={GITHUB_URL}
+      class="hidden items-center rounded-full border border-line px-3.5 py-[7px] text-sm text-body hover:border-line-strong hover:text-fg lg:inline-flex"
+    >
+      <GithubLabel label="GitHub" />
+    </a>
   )
 }
 
@@ -118,18 +131,18 @@ export function Header({ active, hideSearch }: { active?: NavKey; hideSearch?: b
     <header class="sticky top-0 z-40 bg-canvas">
       <nav aria-label="Main" class="mx-auto flex h-16 w-full max-w-6xl items-center gap-4 px-4 md:gap-6 md:px-6">
         <div class="flex items-baseline gap-6 lg:flex-1 lg:basis-0">
-          <a href="/" class="flex rounded-md" aria-label="Ollaya home">
+          <a href="/" class="flex shrink-0 rounded-md" aria-label="Ollaya home">
             <Logo />
           </a>
           <ul class="hidden items-baseline gap-6 text-sm md:flex">
             {links.map((l) => (
-              <li>
+              <li class={l.key === 'github' ? 'lg:hidden' : undefined}>
                 <a
                   href={l.href}
                   class={`underline-offset-4 hover:text-fg hover:underline ${active === l.key ? 'font-medium text-fg' : 'text-body'}`}
                   aria-current={active === l.key ? 'page' : undefined}
                 >
-                  {l.key === 'github' ? <GithubLabel label={l.label} /> : l.label}
+                  {l.label}
                 </a>
               </li>
             ))}
@@ -139,6 +152,7 @@ export function Header({ active, hideSearch }: { active?: NavKey; hideSearch?: b
           {hideSearch ? null : <NavSearch />}
         </div>
         <div class="flex flex-1 items-center justify-end gap-2 md:flex-none lg:flex-1 lg:basis-0">
+          <GithubPill />
           <a
             href="/download"
             class="hidden items-center rounded-full bg-btn px-4 py-2 text-sm font-medium text-btn-fg hover:bg-btn-hover md:inline-flex"
