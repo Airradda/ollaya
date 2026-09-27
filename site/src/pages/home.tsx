@@ -504,14 +504,14 @@ const platforms: { name: string; detail: string; app: Support; cli: Support; gpu
     detail: '10 and 11, x64',
     app: { ok: true, text: 'Desktop app', note: '.exe or .msi' },
     cli: { ok: true, text: 'PowerShell script' },
-    gpu: { ok: true, text: 'NVIDIA, CUDA 13', note: 'Command line' },
+    gpu: { ok: true, text: 'NVIDIA, CUDA 13 or 12', note: 'Command line' },
   },
   {
     name: 'Linux',
     detail: 'x86-64',
     app: { ok: true, text: 'Desktop app', note: 'AppImage, .deb, .rpm' },
     cli: { ok: true, text: 'Install script', note: 'systemd service' },
-    gpu: { ok: true, text: 'NVIDIA, CUDA 13' },
+    gpu: { ok: true, text: 'NVIDIA, CUDA 13 or 12' },
   },
   {
     name: 'Linux',
@@ -525,14 +525,14 @@ const platforms: { name: string; detail: string; app: Support; cli: Support; gpu
     detail: 'Linux on Windows',
     app: { ok: false },
     cli: { ok: true, text: 'Install script', note: 'Same as Linux' },
-    gpu: { ok: true, text: 'NVIDIA, CUDA 13' },
+    gpu: { ok: true, text: 'NVIDIA, CUDA 13 or 12' },
   },
   {
     name: 'Docker',
     detail: 'amd64 and arm64',
     app: { ok: false },
     cli: { ok: true, text: 'Image on GHCR' },
-    gpu: { ok: true, text: 'NVIDIA, CUDA 13', note: ':cuda image, amd64' },
+    gpu: { ok: true, text: 'NVIDIA, CUDA 13 or 12', note: ':cuda and :cuda12, amd64' },
   },
 ]
 
@@ -596,7 +596,7 @@ function Platforms() {
           Install for your platform <Icon name="arrowRight" class="size-4" />
         </a>
         <p class="max-w-md text-[13px] text-muted sm:text-right">
-          NVIDIA GPUs need driver R580 or newer; the install scripts fetch the CUDA libraries only when they find one.
+          NVIDIA GPUs need driver R525 or newer; the install scripts fetch the CUDA libraries only when they find one.
           On a Mac, laya and nli run on the Apple GPU through MLX; other models, AMD and Intel GPUs, and the Windows and Linux desktop apps use the CPU.
         </p>
       </div>

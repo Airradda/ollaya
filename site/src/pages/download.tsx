@@ -112,7 +112,7 @@ export function DownloadPage({ origin }: { origin: string }) {
                   GitHub
                 </a>
                 , checks its sha256 and, where systemd runs, sets up the <code class="font-mono">ollaya</code>{' '}
-                service. With a GPU it also fetches the CUDA libraries (about 1 GB). It never installs drivers.
+                service. With a GPU it also fetches the CUDA libraries (1 to 1.6 GB). It never installs drivers.
               </Note>
             </Step>
             <Step title="Run a model">
@@ -121,7 +121,7 @@ export function DownloadPage({ origin }: { origin: string }) {
             <Requirements
               items={[
                 'x86-64 or ARM64 with glibc 2.38 or newer: Ubuntu 24.04, Debian 13, Fedora 39, RHEL 10 or newer.',
-                'Runs on the CPU. An NVIDIA GPU is optional: driver R580 or newer (CUDA 13), on x86-64.',
+                'Runs on the CPU. An NVIDIA GPU is optional: driver R525 or newer, on x86-64 (CUDA 13 from R580, CUDA 12 before).',
               ]}
             />
             <DesktopApp
@@ -160,7 +160,7 @@ export function DownloadPage({ origin }: { origin: string }) {
             <Requirements
               items={[
                 'Windows 10 or 11 on a 64-bit x86 PC. Runs on the CPU.',
-                'An NVIDIA GPU is optional: driver R580 or newer (CUDA 13). The command line uses it; the desktop app runs on the CPU.',
+                'An NVIDIA GPU is optional: driver R527 or newer (CUDA 13 from R580, CUDA 12 before). The command line uses it; the desktop app runs on the CPU.',
                 <>
                   WSL 2 with the Linux installer works too. The server in WSL answers Windows programs at{' '}
                   <code class="font-mono">localhost:{LOCAL_PORT}</code>.
@@ -194,14 +194,17 @@ export function DownloadPage({ origin }: { origin: string }) {
             </Step>
             <Step title="NVIDIA GPU">
               <CodeBlock code={`docker run -d --name ollaya --gpus=all ${port} ${volume} ${DOCKER_IMAGE}:cuda`} />
-              <Note>Needs the NVIDIA Container Toolkit and a host driver with CUDA 13 support (R580 or newer).</Note>
+              <Note>
+                Needs the NVIDIA Container Toolkit and a host driver with CUDA 13 support (R580 or newer). For drivers
+                with CUDA 12 (R525 to R575), use <code class="font-mono">:cuda12</code>.
+              </Note>
             </Step>
             <Step title="Run a model">
               <CodeBlock code="docker exec -it ollaya ollaya run laya" />
             </Step>
             <Note>
-              The CPU image is built for linux/amd64 and linux/arm64, the <code class="font-mono">:cuda</code> image
-              for linux/amd64. Models are kept in the <code class="font-mono">ollaya</code> volume.
+              The CPU image is built for linux/amd64 and linux/arm64, the <code class="font-mono">:cuda</code> and{' '}
+              <code class="font-mono">:cuda12</code> images for linux/amd64. Models are kept in the <code class="font-mono">ollaya</code> volume.
             </Note>
           </Panel>
         </div>

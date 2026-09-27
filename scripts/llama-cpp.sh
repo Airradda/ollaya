@@ -6,13 +6,16 @@
 # <kind>:
 #   linux-amd64       libllama, libggml, libggml-base and the 14 CPU backends
 #   linux-amd64-cuda  libggml-cuda.so, the CUDA backend (for the CUDA pack, lib/ollaya/cuda_v13)
+#   linux-amd64-cuda12  libggml-cuda.so built with CUDA 12.8 (for the CUDA 12 pack, lib/ollaya/cuda_v12)
 #   linux-arm64, windows-amd64   libllama, libggml, libggml-base and the CPU backends
 #   darwin-arm64      libllama and libggml with its CPU, BLAS, Metal and RPC backends
 #
 # The files are ggml-org's own release build of llama.cpp v0.5.0 (build b11146), byte for byte,
 # from the release archives pinned below by the sha256 GitHub publishes for each asset
 # (docs/decisions/0003-llama-cpp-runtime.md). Both linux-amd64 kinds come from the CUDA 13.4
-# archive, so the CPU and CUDA backends are one build. Nothing else from the archives is staged
+# archive, so the CPU and CUDA backends are one build. linux-amd64-cuda12 takes only the CUDA
+# backend from the same build's CUDA 12.8 archive: same commit and ggml backend interface, loaded
+# next to the CPU libraries of the 13.4 archive. Nothing else from the archives is staged
 # (no llama-server, no tools), and never as a symbolic link: each library is stored once, under
 # the name the loader asks for (libllama.so.0, libllama.0.dylib). <notices-file> receives the
 # third-party notices.
@@ -53,6 +56,8 @@ b=llama-$LLAMA_CPP_BUILD-bin
 case $KIND in
     linux-amd64 | linux-amd64-cuda)
         ASSET=$b-ubuntu-cuda-13.4-x64.tar.gz SUM=1603d9c00a4b6eac8298c5c7868cdb080a3ac31948ab1e457441d71ce274dd7e ;;
+    linux-amd64-cuda12)
+        ASSET=$b-ubuntu-cuda-12.8-x64.tar.gz SUM=c2ab9e19838513ff69d1af8d999ad717dd3c7ee4714ac04c7ed5ab9077c50e4e ;;
     linux-arm64) ASSET=$b-ubuntu-arm64.tar.gz SUM=4aeda6fe68831547e49b7fa87607383ca5352b3d72ca5f70d52ed265f58c131f ;;
     darwin-arm64) ASSET=$b-macos-arm64.tar.gz SUM=1ad3f9eff80edb9dbef4259ad564d1720612ef7eea48fa4afed0e54f5f3d5711 ;;
     windows-amd64) ASSET=$b-win-cpu-x64.zip SUM=14cf1303ca9ac3abd94816850532f9f9a69ac66fbaca3776fc6f9061c2fac1d1 ;;
@@ -90,8 +95,8 @@ src=$WORK
 # wanted NAME: the file belongs to this kind.
 wanted() {
     case $KIND:$1 in
-        linux-amd64-cuda:libggml-cuda.so) return 0 ;;
-        linux-amd64-cuda:*) return 1 ;;
+        linux-amd64-cuda*:libggml-cuda.so) return 0 ;;
+        linux-amd64-cuda*:*) return 1 ;;
         *:libggml-cuda.so) return 1 ;;
         # libllama-common, libllama-server-impl and the other tools' libraries, and multimodal.
         *:libllama-* | *:libmtmd*) return 1 ;;
@@ -129,7 +134,7 @@ for f in "$src"/*; do
     fi
 done
 case $KIND in
-    linux-amd64-cuda) need=libggml-cuda.so ;;
+    linux-amd64-cuda*) need=libggml-cuda.so ;;
     linux-*) need=libllama.so.0 ;;
     darwin-*) need=libllama.0.dylib ;;
     *) need=llama.dll ;;

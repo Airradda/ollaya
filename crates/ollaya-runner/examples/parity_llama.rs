@@ -8,7 +8,8 @@
 //!
 //! `<model-dir>` holds `decision.json`, `calibration.json` and `model.gguf` (the author's GGUF, or
 //! a link to it). llama.cpp is loaded from `$OLLAYA_LIBRARY_PATH/llama`, and its CUDA backend from
-//! `$OLLAYA_LIBRARY_PATH/cuda_v13/libggml-cuda.so` when that exists: the install layout.
+//! `$OLLAYA_LIBRARY_PATH/cuda_v13/libggml-cuda.so` or, failing that, `cuda_v12/libggml-cuda.so`:
+//! the install layout.
 //!
 //! Every case is encoded first:
 //! * a request the reference rejects must be rejected, with the same error class;
@@ -104,10 +105,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let lib = std::env::var_os("OLLAYA_LIBRARY_PATH")
         .map(PathBuf::from)
         .ok_or("set OLLAYA_LIBRARY_PATH to an install's lib/ollaya")?;
-    let cuda = lib.join("cuda_v13").join("libggml-cuda.so");
+    let cuda = ["cuda_v13", "cuda_v12"]
+        .map(|pack| lib.join(pack).join("libggml-cuda.so"))
+        .into_iter()
+        .find(|p| p.is_file());
     let libs = Libraries {
         dir: lib.join("llama"),
-        cuda: cuda.is_file().then_some(cuda),
+        cuda,
     };
     let calibration: CalibrationFile =
         serde_json::from_str(&std::fs::read_to_string(dir.join("calibration.json"))?)?;

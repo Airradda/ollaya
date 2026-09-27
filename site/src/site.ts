@@ -17,7 +17,7 @@ export const HF_URL = 'https://huggingface.co/ollaya-dev'
 export const MCP_ISSUE_URL = `${GITHUB_URL}/issues/1`
 export const SKILL_ISSUE_URL = `${GITHUB_URL}/issues/2`
 
-/** Container images: CPU (linux/amd64, linux/arm64) and NVIDIA GPU (`:cuda`, linux/amd64). */
+/** Container images: CPU (linux/amd64, linux/arm64) and NVIDIA GPU (`:cuda` and `:cuda12`, linux/amd64). */
 export const DOCKER_IMAGE = 'ghcr.io/ollaya-dev/ollaya'
 
 /** Default address of the local Ollaya server (the runtime, not this website). */

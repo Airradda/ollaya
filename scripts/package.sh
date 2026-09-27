@@ -18,8 +18,11 @@
 #   ollaya-windows-amd64.zip         bin/ollaya.exe (with the DLLs it links), lib/ollaya/llama/ (CPU),
 #                                    share/
 #   ollaya-windows-amd64-cuda.zip    the same GPU pack as the Linux one, with the Windows DLLs
+#   ollaya-<platform>-cuda12.*       the CUDA 12 pack, lib/ollaya/cuda_v12/, for drivers older than
+#                                    R580: the same files built for CUDA 12 (.tar.zst or .zip)
 #   ollaya-<platform>-cuda.sha256    sha256 of every library in the CUDA archive (FILES.sha256),
 #                                    which the installers use to skip an unchanged CUDA download
+#   ollaya-<platform>-cuda12.sha256  the same for the CUDA 12 archive
 #   ollaya-darwin-arm64-mlx.sha256   the same for the MLX archive
 #   sha256sum.txt                    over every archive in --out, and the files above
 #
@@ -28,10 +31,12 @@
 #   --cuda        also build the CUDA archive (linux-amd64 and windows-amd64), with Microsoft's
 #                 ONNX Runtime GPU release (docs/decisions/0004-cuda-onnxruntime-builds.md). Its
 #                 runner is the base archive's lib/ollaya/ollaya-cuda-runner.
+#   --cuda12      also build the CUDA 12 archive (same platforms), with Microsoft's cuda12 build.
+#                 The same runner loads either pack.
 #   --mlx         also build the MLX archive (darwin-arm64 only). The binary must have been built
 #                 with `--features ollaya-runner/mlx`, whose build script puts mlx.metallib in
 #                 <target-dir> (docs/decisions/0001-mlx-engine.md).
-#   --no-base     skip the base archive (only useful with --cuda or --mlx)
+#   --no-base     skip the base archive (only useful with --cuda, --cuda12 or --mlx)
 #   --stage DIR   stage the file trees into DIR/<archive name>/ and stop: no archives, no checksums
 #                 (the Dockerfile uses this)
 #   --out DIR     output directory (default: dist)
@@ -67,6 +72,8 @@ ORT_NOTICES_SHA256=0e07b95f3a8d6230037707c5c4a2b554d12c4cb67369669ac255635528ffc
 ORT_GPU_VERSION=1.28.2
 ORT_GPU_LINUX_SHA256=118ca8dbc4e4bb9b3b7fea137d796a89d957c9aa70e1dc3a5199a302cdd5bb32
 ORT_GPU_WINDOWS_SHA256=4b7a2d01a3cc96b12d06c8266af2c8f42c96365c4a0100d45fd874c71b4a2e19
+ORT_GPU12_LINUX_SHA256=e172d4d52bc4399ca36553bd9705389adae900b1f1e08ade50078db1c84b6c1f
+ORT_GPU12_WINDOWS_SHA256=5b5ceb06e90405c7de9acdaf5aa06d288768e6a1e5dc54337281e09c03fc60f9
 
 # MLX (docs/decisions/0001-mlx-engine.md): the pins in crates/ollaya-mlx-sys/build.rs, and the
 # notices of what the `mlx` feature links into bin/ollaya. MLX's ACKNOWLEDGMENTS.md carries the
@@ -120,7 +127,7 @@ write_checksums() {
         : >sha256sum.txt.tmp
         for f in *; do
             case $f in
-                *.tar.zst | *.tgz | *.zip | *-cuda.sha256 | *-mlx.sha256) [ -f "$f" ] || continue ;;
+                *.tar.zst | *.tgz | *.zip | *-cuda.sha256 | *-cuda12.sha256 | *-mlx.sha256) [ -f "$f" ] || continue ;;
                 *) continue ;;
             esac
             printf '%s  %s\n' "$(sha256_of "$f")" "$f" >>sha256sum.txt.tmp
@@ -145,12 +152,13 @@ fetch() {
 
 # --- arguments ---------------------------------------------------------------------------------
 
-PLATFORM='' CUDA=0 MLX=0 BASE=1 STAGE='' OUT=dist
+PLATFORM='' CUDA=0 CUDA12=0 MLX=0 BASE=1 STAGE='' OUT=dist
 while [ $# -gt 0 ]; do
     case $1 in
         --platform) [ $# -ge 2 ] || usage; PLATFORM=$2; shift 2 ;;
         --platform=*) PLATFORM=${1#*=}; shift ;;
         --cuda) CUDA=1; shift ;;
+        --cuda12) CUDA12=1; shift ;;
         --mlx) MLX=1; shift ;;
         --no-base) BASE=0; shift ;;
         --stage) [ $# -ge 2 ] || usage; STAGE=$2; shift 2 ;;
@@ -189,56 +197,76 @@ esac
 FEATURES=${OLLAYA_CARGO_FEATURES-$DEFAULT_FEATURES}
 case $PLATFORM in
     linux-amd64 | windows-amd64) ;;
-    *) [ "$CUDA" = 0 ] || die "--cuda is only supported for linux-amd64 and windows-amd64" ;;
+    *) [ "$CUDA$CUDA12" = 00 ] || die "--cuda and --cuda12 are only supported for linux-amd64 and windows-amd64" ;;
 esac
 [ "$MLX" = 0 ] || [ "$PLATFORM" = darwin-arm64 ] || die "--mlx is only supported for darwin-arm64"
-[ "$BASE" = 1 ] || [ "$CUDA" = 1 ] || [ "$MLX" = 1 ] ||
-    die "--no-base without --cuda or --mlx leaves nothing to do"
+[ "$BASE" = 1 ] || [ "$CUDA" = 1 ] || [ "$CUDA12" = 1 ] || [ "$MLX" = 1 ] ||
+    die "--no-base without --cuda, --cuda12 or --mlx leaves nothing to do"
 # The `mlx` feature links MLX into bin/ollaya, so its notices go into the base archive too.
 case ",$FEATURES," in *mlx,*) LINKS_MLX=1 ;; *) LINKS_MLX=0 ;; esac
 
 EXE=
 [ "$PLATFORM" != windows-amd64 ] || EXE=.exe
 
-# The CUDA pack (lib/ollaya/cuda_v13): Microsoft's ONNX Runtime CUDA 13 build (the library and its
-# shared and CUDA providers), and the NVIDIA libraries kept from
-# the wheels in packaging/cuda-requirements.txt (see is_cuda_lib). Everything else in the wheels
-# (static and import libs, headers, cufftw, nvblas, nvrtc .alt builds) is dropped. The TensorRT
-# and NV TensorRT RTX providers are left out: they need TensorRT 10 (libnvinfer, nvinfer_10.dll),
-# which is not shipped, and the runner only registers the CUDA execution provider.
+# The CUDA packs, lib/ollaya/cuda_v13 and lib/ollaya/cuda_v12: Microsoft's ONNX Runtime CUDA 13 or
+# CUDA 12 build (the library and its shared and CUDA providers), and the NVIDIA libraries kept from
+# the wheels in packaging/cuda-requirements.txt or packaging/cuda12-requirements.txt (see
+# is_cuda_lib). Everything else in the wheels (static and import libs, headers, cufftw, nvblas,
+# nvrtc .alt builds) is dropped. The TensorRT and NV TensorRT RTX providers are left out: they need
+# TensorRT 10 (libnvinfer, nvinfer_10.dll), which is not shipped, and the runner only registers the
+# CUDA execution provider.
 if [ "$PLATFORM" = windows-amd64 ]; then
-    ORT_GPU_ARCHIVE=onnxruntime-win-x64-gpu_cuda13-$ORT_GPU_VERSION.zip
-    ORT_GPU_SHA256=$ORT_GPU_WINDOWS_SHA256
     ORT_LIBRARY=onnxruntime.dll
     ORT_PROVIDERS="onnxruntime_providers_shared.dll onnxruntime_providers_cuda.dll"
-    CUDA_LIBS_REQUIRED="cudart64_13.dll cublas64_13.dll cublasLt64_13.dll cufft64_12.dll curand64_10.dll
-nvrtc64_130_0.dll nvJitLink_130_0.dll cudnn64_9.dll cudnn_graph64_9.dll"
     WHEEL_TAG=win_amd64
     WHEEL_PLATFORMS=win_amd64
     # Windows wheels keep their DLLs in nvidia/*/bin/, Linux wheels in nvidia/*/lib/.
     WHEEL_LIB_DIR=bin
 else
-    ORT_GPU_ARCHIVE=onnxruntime-linux-x64-gpu_cuda13-$ORT_GPU_VERSION.tgz
-    ORT_GPU_SHA256=$ORT_GPU_LINUX_SHA256
     ORT_LIBRARY=libonnxruntime.so.1
     ORT_PROVIDERS="libonnxruntime_providers_shared.so libonnxruntime_providers_cuda.so"
-    CUDA_LIBS_REQUIRED="libcudart.so.13 libcublas.so.13 libcublasLt.so.13 libcufft.so.12 libcurand.so.10
-libnvrtc.so.13 libnvJitLink.so.13 libcudnn.so.9 libcudnn_graph.so.9"
     WHEEL_TAG=x86_64
     WHEEL_PLATFORMS="manylinux_2_28_x86_64 manylinux_2_27_x86_64 manylinux_2_17_x86_64
 manylinux2014_x86_64 manylinux_2_12_x86_64 manylinux2010_x86_64"
     WHEEL_LIB_DIR=lib
 fi
 
-# is_cuda_lib NAME: whether the wheel file NAME goes into the CUDA pack.
+# cuda_pack MAJOR: set up the variables of the CUDA MAJOR pack (13 or 12). cuFFT's soname runs one
+# major behind CUDA's (cufft 12 in CUDA 13, cufft 11 in CUDA 12).
+cuda_pack() {
+    M=$1
+    CUDA_PACK=cuda_v$M
+    case $M in
+        13) CUDA_NAME=ollaya-$PLATFORM-cuda CUFFT=12 LLAMA_CUDA_KIND=linux-amd64-cuda
+            CUDA_REQUIREMENTS=$ROOT/packaging/cuda-requirements.txt ;;
+        12) CUDA_NAME=ollaya-$PLATFORM-cuda12 CUFFT=11 LLAMA_CUDA_KIND=linux-amd64-cuda12
+            CUDA_REQUIREMENTS=$ROOT/packaging/cuda12-requirements.txt ;;
+        *) die "no CUDA $M pack" ;;
+    esac
+    if [ "$PLATFORM" = windows-amd64 ]; then
+        ORT_GPU_ARCHIVE=onnxruntime-win-x64-gpu_cuda$M-$ORT_GPU_VERSION.zip
+        ORT_GPU_SHA256=$ORT_GPU_WINDOWS_SHA256
+        [ "$M" = 13 ] || ORT_GPU_SHA256=$ORT_GPU12_WINDOWS_SHA256
+        CUDA_LIBS_REQUIRED="cudart64_$M.dll cublas64_$M.dll cublasLt64_$M.dll cufft64_$CUFFT.dll curand64_10.dll
+nvrtc64_${M}0_0.dll nvJitLink_${M}0_0.dll cudnn64_9.dll cudnn_graph64_9.dll"
+    else
+        ORT_GPU_ARCHIVE=onnxruntime-linux-x64-gpu_cuda$M-$ORT_GPU_VERSION.tgz
+        ORT_GPU_SHA256=$ORT_GPU_LINUX_SHA256
+        [ "$M" = 13 ] || ORT_GPU_SHA256=$ORT_GPU12_LINUX_SHA256
+        CUDA_LIBS_REQUIRED="libcudart.so.$M libcublas.so.$M libcublasLt.so.$M libcufft.so.$CUFFT libcurand.so.10
+libnvrtc.so.$M libnvJitLink.so.$M libcudnn.so.9 libcudnn_graph.so.9"
+    fi
+}
+
+# is_cuda_lib NAME: whether the wheel file NAME goes into the pack cuda_pack set up.
 is_cuda_lib() {
     case $PLATFORM:$1 in
-        linux-*:libcudart.so.13 | linux-*:libcublas.so.13 | linux-*:libcublasLt.so.13 | \
-            linux-*:libcufft.so.12 | linux-*:libcurand.so.10 | linux-*:libnvrtc.so.13 | \
-            linux-*:libnvJitLink.so.13 | linux-*:libcudnn*.so.9 | linux-*:libnvrtc-builtins.so.13.*) ;;
-        windows-*:cudart64_13.dll | windows-*:cublas64_13.dll | windows-*:cublasLt64_13.dll | \
-            windows-*:cufft64_12.dll | windows-*:curand64_10.dll | windows-*:nvrtc64_130_0.dll | \
-            windows-*:nvJitLink_130_0.dll | windows-*:cudnn*64_9.dll | windows-*:nvrtc-builtins64_13*.dll) ;;
+        linux-*:libcudart.so."$M" | linux-*:libcublas.so."$M" | linux-*:libcublasLt.so."$M" | \
+            linux-*:libcufft.so."$CUFFT" | linux-*:libcurand.so.10 | linux-*:libnvrtc.so."$M" | \
+            linux-*:libnvJitLink.so."$M" | linux-*:libcudnn*.so.9 | linux-*:libnvrtc-builtins.so."$M".*) ;;
+        windows-*:cudart64_"$M".dll | windows-*:cublas64_"$M".dll | windows-*:cublasLt64_"$M".dll | \
+            windows-*:cufft64_"$CUFFT".dll | windows-*:curand64_10.dll | windows-*:nvrtc64_"$M"0_0.dll | \
+            windows-*:nvJitLink_"$M"0_0.dll | windows-*:cudnn*64_9.dll | windows-*:nvrtc-builtins64_"$M"*.dll) ;;
         *) return 1 ;;
     esac
 }
@@ -458,7 +486,7 @@ pip_download() {
     dest=$1
     set -- download --no-deps --only-binary=:all: --python-version 3.12
     for p in $WHEEL_PLATFORMS; do set -- "$@" --platform "$p"; done
-    set -- "$@" --require-hashes -r "$ROOT/packaging/cuda-requirements.txt" -d "$dest"
+    set -- "$@" --require-hashes -r "$CUDA_REQUIREMENTS" -d "$dest"
     # Windows has `python`, and often a `python3` that only opens the Microsoft Store.
     for py in ${PYTHON:-python3 python}; do
         if have "$py" && "$py" -m pip --version >/dev/null 2>&1; then
@@ -470,11 +498,13 @@ pip_download() {
     uvx pip --disable-pip-version-check -q "$@"
 }
 
+# stage_cuda MAJOR: the CUDA MAJOR pack (13 or 12).
 stage_cuda() {
-    name=ollaya-$PLATFORM-cuda
+    cuda_pack "$1"
+    name=$CUDA_NAME
     root=$TREES/$name
-    lib=$root/lib/ollaya/cuda_v13
-    doc=$root/share/doc/ollaya/cuda_v13
+    lib=$root/lib/ollaya/$CUDA_PACK
+    doc=$root/share/doc/ollaya/$CUDA_PACK
     rm -rf "$root"
     mkdir -p "$lib" "$doc/licenses"
     have unzip || die "missing tool: unzip"
@@ -498,7 +528,7 @@ stage_cuda() {
     pip_download "$wheels"
 
     : >"$WORK/cuda-libs"
-    sed -n 's/^\(nvidia-[a-z0-9-]*\)==\([^ ]*\).*/\1 \2/p' "$ROOT/packaging/cuda-requirements.txt" \
+    sed -n 's/^\(nvidia-[a-z0-9-]*\)==\([^ ]*\).*/\1 \2/p' "$CUDA_REQUIREMENTS" \
         >"$WORK/cuda-pins"
     while read -r pname pver; do
         pkg=$pname==$pver
@@ -532,9 +562,9 @@ stage_cuda() {
     if [ "$PLATFORM" = linux-amd64 ]; then
         # llama.cpp's CUDA backend, which finds libcudart and libcublas next to it. The Windows
         # pack has none yet: GGUF models run on the CPU there.
-        OLLAYA_CACHE=$CACHE "$ROOT/scripts/llama-cpp.sh" linux-amd64-cuda "$WORK/llama-cuda" \
+        OLLAYA_CACHE=$CACHE "$ROOT/scripts/llama-cpp.sh" "$LLAMA_CUDA_KIND" "$WORK/llama-$CUDA_PACK" \
             "$doc/llama.cpp-THIRD_PARTY_NOTICES"
-        cp "$WORK/llama-cuda/libggml-cuda.so" "$lib/libggml-cuda.so"
+        cp "$WORK/llama-$CUDA_PACK/libggml-cuda.so" "$lib/libggml-cuda.so"
     fi
     # FILES.sha256 fingerprints the libraries themselves (the archive's own checksum changes with
     # every release's timestamps). The installers compare it with the installed copy and skip the
@@ -551,8 +581,8 @@ stage_cuda() {
 
     cp "$ort/ThirdPartyNotices.txt" "$doc/onnxruntime-ThirdPartyNotices.txt"
     {
-        printf 'Ollaya %s CUDA accelerator package (%s): third-party notices\n\n' "$VERSION" "$PLATFORM"
-        printf 'Everything in lib/ollaya/cuda_v13 is third-party software. None of it is covered by\n'
+        printf 'Ollaya %s CUDA %s accelerator package (%s): third-party notices\n\n' "$VERSION" "$M" "$PLATFORM"
+        printf 'Everything in lib/ollaya/%s is third-party software. None of it is covered by\n' "$CUDA_PACK"
         printf "Ollaya's Apache-2.0 license.\n\n"
         printf '1. ONNX Runtime %s (https://github.com/microsoft/onnxruntime), Microsoft'"'"'s\n' \
             "$ORT_GPU_VERSION"
@@ -655,7 +685,8 @@ archive() {
 }
 
 [ "$BASE" = 0 ] || stage_base
-[ "$CUDA" = 0 ] || stage_cuda
+[ "$CUDA" = 0 ] || stage_cuda 13
+[ "$CUDA12" = 0 ] || stage_cuda 12
 [ "$MLX" = 0 ] || stage_mlx
 
 if [ -n "$STAGE" ]; then
@@ -667,6 +698,10 @@ fi
 if [ "$CUDA" = 1 ]; then
     archive "ollaya-$PLATFORM-cuda" lib share
     cp "$TREES/ollaya-$PLATFORM-cuda/lib/ollaya/cuda_v13/FILES.sha256" "$OUT/ollaya-$PLATFORM-cuda.sha256"
+fi
+if [ "$CUDA12" = 1 ]; then
+    archive "ollaya-$PLATFORM-cuda12" lib share
+    cp "$TREES/ollaya-$PLATFORM-cuda12/lib/ollaya/cuda_v12/FILES.sha256" "$OUT/ollaya-$PLATFORM-cuda12.sha256"
 fi
 if [ "$MLX" = 1 ]; then
     archive "ollaya-$PLATFORM-mlx" lib share

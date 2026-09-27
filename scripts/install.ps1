@@ -5,8 +5,9 @@
 # Downloads the latest release's ollaya-windows-amd64.zip from GitHub, checks it against the
 # release's sha256sum.txt, unpacks it into %LOCALAPPDATA%\Programs\Ollaya and puts its bin folder
 # on the user's PATH. With an NVIDIA GPU whose driver supports CUDA 13 (R580 or newer), it also
-# installs the GPU pack, ollaya-windows-amd64-cuda.zip (about 1 GB), into lib\ollaya\cuda_v13, and
-# keeps an installed pack whose libraries are unchanged. No administrator rights. Settings, as
+# installs the GPU pack, ollaya-windows-amd64-cuda.zip (about 1 GB), into lib\ollaya\cuda_v13;
+# with a CUDA 12 driver (R527 to R576), ollaya-windows-amd64-cuda12.zip into lib\ollaya\cuda_v12
+# (0.7.3 and later). It keeps an installed pack whose libraries are unchanged. No administrator rights. Settings, as
 # environment variables:
 #   OLLAYA_VERSION   a version such as 0.5.0 (default: the latest release)
 #   OLLAYA_REPO      GitHub repository (default: ollaya-dev/ollaya)
@@ -30,10 +31,11 @@ function Invoke-Quiet([string]$exe, [string[]]$arguments) {
 
 function Test-Enabled([string]$value) { $value -and $value -notin '0', 'false', 'no' }
 
-# The NVIDIA GPU and what its driver supports. State: none, nodriver, oldriver or ready. The GPU
-# pack needs CUDA 13, which NVIDIA drivers support from R580 on.
+# The NVIDIA GPU and what its driver supports. State: none, nodriver, oldriver or ready. Pack: the
+# GPU pack the driver can run, cuda_v13 (CUDA 13, drivers from R580 on) or cuda_v12 (CUDA 12,
+# from R527 on).
 function Get-NvidiaGpu {
-    $gpu = [pscustomobject]@{ State = 'none'; Name = ''; Driver = ''; Cuda = '' }
+    $gpu = [pscustomobject]@{ State = 'none'; Name = ''; Driver = ''; Cuda = ''; Pack = 'cuda_v13' }
     $smi = Get-Command nvidia-smi.exe -ErrorAction SilentlyContinue |
         Select-Object -First 1 -ExpandProperty Source
     if (-not $smi -and (Test-Path "$env:SystemRoot\System32\nvidia-smi.exe")) {
@@ -70,8 +72,11 @@ function Get-NvidiaGpu {
     }
     $gpu.State = 'ready'
     $cudaMajor = if ($gpu.Cuda) { [int]($gpu.Cuda -split '\.')[0] } else { $null }
-    if (($null -ne $cudaMajor -and $cudaMajor -lt 13) -or [int]($gpu.Driver -split '\.')[0] -lt 580) {
+    $driverMajor = [int]($gpu.Driver -split '\.')[0]
+    if (($null -ne $cudaMajor -and $cudaMajor -lt 12) -or $driverMajor -lt 527) {
         $gpu.State = 'oldriver'
+    } elseif (($null -ne $cudaMajor -and $cudaMajor -lt 13) -or $driverMajor -lt 580) {
+        $gpu.Pack = 'cuda_v12'
     }
     $gpu
 }
@@ -90,11 +95,12 @@ function Install-Ollaya {
     }
     $dest = if ($env:OLLAYA_INSTALL_DIR) { $env:OLLAYA_INSTALL_DIR } else { Join-Path $env:LOCALAPPDATA 'Programs\Ollaya' }
     $archive = 'ollaya-windows-amd64.zip'
-    $cudaArchive = 'ollaya-windows-amd64-cuda.zip'
-    $cudaFiles = 'ollaya-windows-amd64-cuda.sha256'
-    $cudaDir = Join-Path $dest 'lib\ollaya\cuda_v13'
 
     $gpu = Get-NvidiaGpu
+    $cudaSuffix = if ($gpu.Pack -eq 'cuda_v12') { '12' } else { '' }
+    $cudaArchive = "ollaya-windows-amd64-cuda$cudaSuffix.zip"
+    $cudaFiles = "ollaya-windows-amd64-cuda$cudaSuffix.sha256"
+    $cudaDir = Join-Path $dest "lib\ollaya\$($gpu.Pack)"
     $wantCuda = $false
     switch ($gpu.State) {
         'ready' {
@@ -105,7 +111,7 @@ function Install-Ollaya {
             }
         }
         'oldriver' {
-            Write-Warning "$($gpu.Name): driver $($gpu.Driver)$(if ($gpu.Cuda) { " (CUDA $($gpu.Cuda))" }). Ollaya's GPU pack needs a driver with CUDA 13 support (R580 or newer)."
+            Write-Warning "$($gpu.Name): driver $($gpu.Driver)$(if ($gpu.Cuda) { " (CUDA $($gpu.Cuda))" }). Ollaya's GPU packs need a driver with CUDA 12 support (R527 or newer)."
             Write-Warning 'Ollaya will use the CPU. Update the driver (https://www.nvidia.com/drivers), then run this script again.'
         }
         'nodriver' {
@@ -146,7 +152,11 @@ function Install-Ollaya {
         $downloadCuda = $false
         $keepCuda = $false
         if ($wantCuda -and -not $sums.ContainsKey($cudaArchive)) {
-            Write-Warning 'This release has no GPU pack for Windows; Ollaya will use the CPU.'
+            if ($cudaSuffix) {
+                Write-Warning "This release's GPU pack needs a driver with CUDA 13 support (R580 or newer); Ollaya will use the CPU."
+            } else {
+                Write-Warning 'This release has no GPU pack for Windows; Ollaya will use the CPU.'
+            }
         } elseif ($wantCuda) {
             # The release lists the sha256 of every library in the pack ($cudaFiles, installed as
             # FILES.sha256). When the installed libraries match it, keep them instead of
@@ -160,7 +170,7 @@ function Install-Ollaya {
                 }
             }
             if (-not $keepCuda) {
-                Write-Host '>>> Downloading the GPU pack (NVIDIA CUDA libraries, about 1 GB)'
+                Write-Host ">>> Downloading the GPU pack (NVIDIA CUDA $(if ($cudaSuffix) { '12' } else { '13' }) libraries, about $(if ($cudaSuffix) { '2' } else { '1.4' }) GB)"
                 Get-Verified $cudaArchive
                 $downloadCuda = $true
             }
@@ -179,8 +189,8 @@ function Install-Ollaya {
         if ($downloadCuda) {
             Expand-Archive -Path "$tmp\$cudaArchive" -DestinationPath $stage -Force
             Remove-Item -Force "$tmp\$cudaArchive"
-            if (-not (Test-Path "$stage\lib\ollaya\cuda_v13\onnxruntime_providers_cuda.dll")) {
-                throw "$cudaArchive does not contain lib\ollaya\cuda_v13"
+            if (-not (Test-Path "$stage\lib\ollaya\$($gpu.Pack)\onnxruntime_providers_cuda.dll")) {
+                throw "$cudaArchive does not contain lib\ollaya\$($gpu.Pack)"
             }
         }
         if (-not (Test-Path "$stage\bin\ollaya.exe")) { throw "$archive does not contain bin\ollaya.exe" }
@@ -192,9 +202,9 @@ function Install-Ollaya {
         if ($keepCuda) {
             Get-ChildItem -LiteralPath $cudaDir -Filter 'ollaya-runner-*' -ErrorAction SilentlyContinue |
                 Remove-Item -Force -ErrorAction SilentlyContinue
-            $notices = Join-Path $dest 'share\doc\ollaya\cuda_v13'
-            if ((Test-Path $notices) -and -not (Test-Path "$stage\share\doc\ollaya\cuda_v13")) {
-                Move-Item $notices "$stage\share\doc\ollaya\cuda_v13"
+            $notices = Join-Path $dest "share\doc\ollaya\$($gpu.Pack)"
+            if ((Test-Path $notices) -and -not (Test-Path "$stage\share\doc\ollaya\$($gpu.Pack)")) {
+                Move-Item $notices "$stage\share\doc\ollaya\$($gpu.Pack)"
             }
         } elseif (Test-Path $libOllaya) {
             try {
@@ -208,7 +218,7 @@ function Install-Ollaya {
             Move-Item (Join-Path $stage $part) (Join-Path $dest $part)
         }
         # lib\ollaya holds llama.cpp's libraries (llama), which run GGUF models, and the GPU pack
-        # (cuda_v13). A kept GPU pack stays; everything else there is replaced.
+        # (cuda_v13 or cuda_v12). A kept GPU pack stays; everything else there is replaced.
         if (Test-Path "$stage\lib\ollaya") {
             New-Item -ItemType Directory -Force -Path $libOllaya | Out-Null
             foreach ($item in Get-ChildItem -LiteralPath "$stage\lib\ollaya") {

@@ -101,11 +101,14 @@ Option 2, with the smallest change to what ships:
   if it fails to load, a CPU runner from `bin/ollaya`. The GPU runner treats `auto` as the first
   GPU and never falls back to the CPU inside its own process. CPU numbers are the same as before
   this change. GGUF models run on llama.cpp and keep the GPU runner, as before.
-- **Deferred to the next release:** a CUDA 12 pack (`lib/ollaya/cuda_v12`, Microsoft's cuda12 build with CUDA 12.8 and cuDNN 9 for
-  CUDA 12 from NVIDIA's wheels) for drivers older than R580. The daemon already looks for it after
-  `cuda_v13`, but this release ships only the CUDA 13 pack (sm_120 included). Still needed: pinned
-  CUDA 12 wheels, `package.sh` staging, llama.cpp's CUDA 12 backend, and the installers picking
-  one pack by the driver's CUDA version.
+- **A CUDA 12 pack, from 0.7.3** (it was deferred from 0.7.2): `lib/ollaya/cuda_v12`, Microsoft's
+  cuda12 build with CUDA 12.8 and cuDNN 9 for CUDA 12 from NVIDIA's wheels
+  (`packaging/cuda12-requirements.txt`) and llama.cpp's CUDA 12.8 `libggml-cuda.so`, for drivers
+  without CUDA 13 support. The installers pick one pack by the driver's CUDA version
+  (`install.sh`: 13 or newer gets `cuda_v13`, 12.x `cuda_v12`; `install.ps1` the same, or R580/R527
+  from WMI), the daemon looks for `cuda_v13` first, and the Docker image `:cuda12` carries it.
+  On the RTX 4090 every parity check gives the CUDA 13 pack's numbers (docs/distribution.md,
+  "The CUDA 12 pack").
 - Microsoft's version moves with `ort`: when `ort` moves to ONNX Runtime 1.x, the GPU pack moves
   to Microsoft's 1.x release, and both CPU and CUDA parity run again (PROJECT_NOTES: ORT changes
   only in a dedicated change).

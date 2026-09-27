@@ -97,15 +97,15 @@ Browse them at [ollaya.dev/search](https://ollaya.dev/search). Laya tags ending 
 
 - **Linux** (x86_64 or arm64, glibc ≥ 2.38, e.g. Ubuntu 24.04+):
   `curl -fsSL https://ollaya.dev/install.sh | sh`. When an NVIDIA GPU is present
-  (driver R580+), the installer adds the CUDA runtime.
+  (driver R525+), the installer adds the CUDA runtime: CUDA 13 for R580+, CUDA 12 for older drivers.
 - **macOS** (Apple silicon): the same command.
 - **Windows** (x64): `irm https://ollaya.dev/install.ps1 | iex` in PowerShell. When an NVIDIA GPU is
-  present (driver R580+), the installer adds the CUDA runtime, as on Linux.
+  present (driver R527+), the installer adds the CUDA runtime, as on Linux.
 - **Desktop app** for macOS, Windows and Linux: start and stop the server, download models and run
   them in one window. On macOS it lives in the menu bar. Get it from
   [ollaya.dev/download](https://ollaya.dev/download).
-- **Docker:** `docker run -d --gpus=all -p 11435:11435 ghcr.io/ollaya-dev/ollaya:cuda`, or
-  `ghcr.io/ollaya-dev/ollaya` for CPU only.
+- **Docker:** `docker run -d --gpus=all -p 11435:11435 ghcr.io/ollaya-dev/ollaya:cuda`
+  (`:cuda12` for host drivers older than R580), or `ghcr.io/ollaya-dev/ollaya` for CPU only.
 
 Configuration is through environment variables: `OLLAYA_HOST`, `OLLAYA_MODELS`,
 `OLLAYA_KEEP_ALIVE`, `OLLAYA_DEVICE`, `OLLAYA_API_KEY` and others, listed in

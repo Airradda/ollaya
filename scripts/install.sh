@@ -219,8 +219,11 @@ main() {
     # --- GPU -------------------------------------------------------------------------------
 
     # NVIDIA_STATE: none | nodriver | oldriver | ready. Only linux-amd64 has a CUDA package.
+    # CUDA_PACK: cuda_v13, or cuda_v12 for drivers without CUDA 13 support (R525 to R575), which
+    # releases from 0.7.3 on ship as ollaya-<platform>-cuda12.
     NVIDIA_STATE=none
     CUDA_DRIVER=
+    CUDA_PACK=cuda_v13
     nvidia_smi=
     if [ "$OS" = Linux ]; then
         if [ "$WSL" = 2 ]; then
@@ -251,7 +254,11 @@ main() {
                 CUDA_DRIVER=$("$nvidia_smi" 2>/dev/null | sed -n 's/.*CUDA[A-Z ]*Version: *\([0-9][0-9.]*\).*/\1/p' | head -n 1) ||
                     CUDA_DRIVER=
                 if [ -n "$CUDA_DRIVER" ] && [ "${CUDA_DRIVER%%.*}" -lt 13 ]; then
-                    NVIDIA_STATE=oldriver
+                    if [ "${CUDA_DRIVER%%.*}" -ge 12 ] && grep -q " ollaya-$PLATFORM-cuda12\.tar\.zst\$" "$TMP/sha256sum.txt"; then
+                        CUDA_PACK=cuda_v12
+                    else
+                        NVIDIA_STATE=oldriver
+                    fi
                 fi
             fi
         fi
@@ -269,7 +276,11 @@ main() {
             fi
             ;;
         oldriver)
-            warn "the NVIDIA driver supports CUDA $CUDA_DRIVER, but Ollaya's GPU libraries need a driver with CUDA 13 support (R580 or newer)."
+            if grep -q " ollaya-$PLATFORM-cuda12\.tar\.zst\$" "$TMP/sha256sum.txt"; then
+                warn "the NVIDIA driver supports CUDA $CUDA_DRIVER, but Ollaya's GPU libraries need a driver with CUDA 12 support (R525 or newer)."
+            else
+                warn "the NVIDIA driver supports CUDA $CUDA_DRIVER, but Ollaya $VERSION's GPU libraries need a driver with CUDA 13 support (R580 or newer)."
+            fi
             warn "Ollaya will use the CPU. Update the driver, then run this script again."
             ;;
         nodriver)
@@ -293,16 +304,18 @@ main() {
         # The release lists the sha256 of every CUDA library (ollaya-<platform>-cuda.sha256, also
         # installed as FILES.sha256). When the installed libraries match it, keep them instead of
         # downloading the same ~1 GB again. Releases before 0.4.0 have no such file.
-        CUDA_DIR=$PREFIX/lib/ollaya/cuda_v13
-        CUDA_FILES=ollaya-$PLATFORM-cuda.sha256
+        CUDA_SUFFIX= CUDA_SIZE="about 1 GB"
+        [ "$CUDA_PACK" = cuda_v13 ] || CUDA_SUFFIX=12 CUDA_SIZE="about 1.6 GB"
+        CUDA_DIR=$PREFIX/lib/ollaya/$CUDA_PACK
+        CUDA_FILES=ollaya-$PLATFORM-cuda$CUDA_SUFFIX.sha256
         if [ -f "$CUDA_DIR/FILES.sha256" ] && grep -q " $CUDA_FILES\$" "$TMP/sha256sum.txt" &&
             (fetch_verified "$CUDA_FILES") >/dev/null 2>&1 && cmp -s "$TMP/$CUDA_FILES" "$CUDA_DIR/FILES.sha256" &&
             cuda_intact "$CUDA_DIR"; then
             CUDA_KEEP=true
             status "The NVIDIA CUDA libraries are unchanged; keeping the installed copy"
         else
-            CUDA_ARCHIVE=ollaya-$PLATFORM-cuda.tar.zst
-            status "Downloading the NVIDIA CUDA libraries (about 1 GB)"
+            CUDA_ARCHIVE=ollaya-$PLATFORM-cuda$CUDA_SUFFIX.tar.zst
+            status "Downloading the NVIDIA CUDA ${CUDA_PACK#cuda_v} libraries ($CUDA_SIZE)"
             fetch_verified "$CUDA_ARCHIVE"
         fi
     fi
@@ -345,16 +358,16 @@ main() {
     [ -z "$CUDA_ARCHIVE" ] || unpack "$CUDA_ARCHIVE"
     [ -z "$MLX_ARCHIVE" ] || unpack "$MLX_ARCHIVE"
     [ -f "$STAGE/bin/ollaya" ] || error "$BASE_ARCHIVE does not contain bin/ollaya"
-    if [ -n "$CUDA_ARCHIVE" ] && [ ! -f "$STAGE/lib/ollaya/cuda_v13/libonnxruntime_providers_cuda.so" ]; then
-        error "$CUDA_ARCHIVE does not contain lib/ollaya/cuda_v13"
+    if [ -n "$CUDA_ARCHIVE" ] && [ ! -f "$STAGE/lib/ollaya/$CUDA_PACK/libonnxruntime_providers_cuda.so" ]; then
+        error "$CUDA_ARCHIVE does not contain lib/ollaya/$CUDA_PACK"
     fi
 
     $SUDO mkdir -p "$BINDIR" "$PREFIX/share/doc"
     $SUDO chmod 0755 "$STAGE/bin/ollaya"
     $SUDO mv -f "$STAGE/bin/ollaya" "$BINDIR/ollaya"
     # Kept CUDA libraries keep their notices too (the base archive replaces share/doc/ollaya).
-    if $CUDA_KEEP && [ -d "$PREFIX/share/doc/ollaya/cuda_v13" ] && [ ! -e "$STAGE/share/doc/ollaya/cuda_v13" ]; then
-        $SUDO mv "$PREFIX/share/doc/ollaya/cuda_v13" "$STAGE/share/doc/ollaya/cuda_v13"
+    if $CUDA_KEEP && [ -d "$PREFIX/share/doc/ollaya/$CUDA_PACK" ] && [ ! -e "$STAGE/share/doc/ollaya/$CUDA_PACK" ]; then
+        $SUDO mv "$PREFIX/share/doc/ollaya/$CUDA_PACK" "$STAGE/share/doc/ollaya/$CUDA_PACK"
     fi
     if $MLX_KEEP && [ -d "$PREFIX/share/doc/ollaya/mlx_metal" ] && [ ! -e "$STAGE/share/doc/ollaya/mlx_metal" ]; then
         $SUDO mv "$PREFIX/share/doc/ollaya/mlx_metal" "$STAGE/share/doc/ollaya/mlx_metal"
@@ -373,8 +386,8 @@ main() {
     # they move into the new tree unchanged.
     if $CUDA_KEEP; then
         $SUDO mkdir -p "$STAGE/lib/ollaya"
-        $SUDO rm -rf "$STAGE/lib/ollaya/cuda_v13"
-        $SUDO mv "$PREFIX/lib/ollaya/cuda_v13" "$STAGE/lib/ollaya/cuda_v13"
+        $SUDO rm -rf "$STAGE/lib/ollaya/$CUDA_PACK"
+        $SUDO mv "$PREFIX/lib/ollaya/$CUDA_PACK" "$STAGE/lib/ollaya/$CUDA_PACK"
     fi
     if $MLX_KEEP; then
         $SUDO mkdir -p "$STAGE/lib/ollaya"
@@ -522,7 +535,7 @@ EOF
 
     status "Installed Ollaya $VERSION: $BINDIR/ollaya"
     if [ -n "$CUDA_ARCHIVE" ] || $CUDA_KEEP; then
-        status "NVIDIA GPU support: $PREFIX/lib/ollaya/cuda_v13${CUDA_DRIVER:+ (driver supports CUDA $CUDA_DRIVER)}"
+        status "NVIDIA GPU support: $PREFIX/lib/ollaya/$CUDA_PACK${CUDA_DRIVER:+ (driver supports CUDA $CUDA_DRIVER)}"
     elif [ "$NVIDIA_STATE" = none ] && [ "$OS" = Linux ]; then
         status "No NVIDIA GPU found; Ollaya will run on the CPU"
     fi

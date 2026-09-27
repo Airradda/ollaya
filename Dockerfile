@@ -1,11 +1,13 @@
 # syntax=docker/dockerfile:1
 
-# Ollaya container images. Two targets:
+# Ollaya container images. Three targets:
 #   cpu (default)  linux/amd64 and linux/arm64   docker build -t ollaya .
 #   cuda           linux/amd64                   docker build --target cuda -t ollaya:cuda .
-# Both run `ollaya serve` as the unprivileged user ollaya (uid 1000), listen on 0.0.0.0:11435 and
-# keep models in the volume /home/ollaya/.ollaya. The cuda image needs the NVIDIA Container
-# Toolkit and a host driver with CUDA 13 support (R580 or newer):
+#   cuda12         linux/amd64                   docker build --target cuda12 -t ollaya:cuda12 .
+# All run `ollaya serve` as the unprivileged user ollaya (uid 1000), listen on 0.0.0.0:11435 and
+# keep models in the volume /home/ollaya/.ollaya. The cuda images need the NVIDIA Container
+# Toolkit and a host driver with CUDA 13 support (R580 or newer) for cuda, or CUDA 12 support
+# (R525 or newer) for cuda12:
 #   docker run -d --gpus=all -v ollaya:/home/ollaya/.ollaya -p 11435:11435 ghcr.io/ollaya-dev/ollaya:cuda
 # See docs/distribution.md.
 
@@ -61,6 +63,14 @@ RUN --mount=type=cache,id=ollaya-nvidia-wheels,target=/root/.cache/ollaya-packag
     scripts/package.sh --platform linux-amd64 --cuda --no-base --stage /stage /out \
         "${OLLAYA_BUILD_VERSION}"
 
+# The same for CUDA 12 (Microsoft's cuda12 build), exactly as in the -cuda12 tarball.
+FROM build AS build-cuda12
+ARG OLLAYA_BUILD_VERSION=0.0.0-dev
+COPY --from=uv /uv /uvx /usr/local/bin/
+RUN --mount=type=cache,id=ollaya-nvidia-wheels,target=/root/.cache/ollaya-package/wheels,sharing=locked \
+    scripts/package.sh --platform linux-amd64 --cuda12 --no-base --stage /stage /out \
+        "${OLLAYA_BUILD_VERSION}"
+
 # --- runtime ---------------------------------------------------------------------------------
 
 # Debian 13: pyke's ONNX Runtime needs glibc 2.38 or newer. bash (for the health check),
@@ -96,6 +106,12 @@ FROM runtime AS cuda
 COPY --from=build-cuda /stage/base/ /usr/
 COPY --from=build-cuda /stage/ollaya-linux-amd64-cuda/ /usr/
 # Read by the NVIDIA Container Toolkit, which mounts the host driver (libcuda.so.1) at run time.
+ENV NVIDIA_VISIBLE_DEVICES=all \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility
+
+FROM runtime AS cuda12
+COPY --from=build-cuda12 /stage/base/ /usr/
+COPY --from=build-cuda12 /stage/ollaya-linux-amd64-cuda12/ /usr/
 ENV NVIDIA_VISIBLE_DEVICES=all \
     NVIDIA_DRIVER_CAPABILITIES=compute,utility
 

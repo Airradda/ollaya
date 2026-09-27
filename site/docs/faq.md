@@ -55,13 +55,13 @@ A decision is a single forward pass. Measured end to end through the HTTP API on
 
 ## Do I need a GPU?
 
-No. Ollaya runs on the CPU, and on x86-64 Linux and Windows uses an NVIDIA GPU with driver R580 or newer (CUDA 13) when one is present. The install scripts download the CUDA libraries only when they find a GPU. The desktop app runs models on the CPU. GGUF models such as `winnow` run on llama.cpp, which also uses the GPU of Apple silicon Macs (Metal); their parity has been checked on CUDA and the x86-64 CPU, not yet on Metal. They are large language models, so a GPU makes a much bigger difference for them than for the encoder models: see each model's page for measured speeds.
+No. Ollaya runs on the CPU, and on x86-64 Linux and Windows uses an NVIDIA GPU with driver R525 or newer when one is present (CUDA 13 libraries from R580 on, CUDA 12 before that). The install scripts download the CUDA libraries only when they find a GPU. The desktop app runs models on the CPU. GGUF models such as `winnow` run on llama.cpp, which also uses the GPU of Apple silicon Macs (Metal); their parity has been checked on CUDA and the x86-64 CPU, not yet on Metal. They are large language models, so a GPU makes a much bigger difference for them than for the encoder models: see each model's page for measured speeds.
 
 ## Which platforms are supported?
 
 - **Linux** x86-64 and ARM64 with glibc 2.38 or newer: Ubuntu 24.04, Debian 13, Fedora 39, RHEL 10 or newer.
 - **macOS** 14 or newer on Apple silicon. `laya` and `nli:modernbert-large` run on the Apple GPU through MLX, 2 to 3 times faster than on the CPU; the other models run on the CPU.
-- **Docker:** `ghcr.io/ollaya-dev/ollaya` for linux/amd64 and linux/arm64, and `:cuda` for NVIDIA GPUs. Use it on older Linux distributions too.
+- **Docker:** `ghcr.io/ollaya-dev/ollaya` for linux/amd64 and linux/arm64, and `:cuda` for NVIDIA GPUs (`:cuda12` for host drivers older than R580). Use it on older Linux distributions too.
 - **Windows** 10 and 11 on 64-bit x86 PCs: the desktop app (CPU), or `irm {{SITE_ORIGIN}}/install.ps1 | iex` for the command line, which also uses an NVIDIA GPU. WSL 2 with the Linux installer works too.
 - **The desktop app** runs on all three: see [Download](/download).
 
