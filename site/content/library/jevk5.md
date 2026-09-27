@@ -20,7 +20,8 @@ Point any TypeSafe client at `http://localhost:11435` and set the model to `jevk
 
 ## Speed
 
-- **RTX 4090, in the runner:** five questions with a short state take about 288 ms at the median, without the HTTP layer. Every question is its own pass over the whole prompt (see below), so the time grows with the state times the number of questions.
+- **RTX 4090, through the HTTP API:** the triage preset (five questions) on a short customer message takes 105 ms at the median of 15 warm requests.
+- **RTX 4090, in the runner:** on the parity fixtures, whose states are longer, five questions take about 288 ms at the median. Every question is its own pass over the whole prompt (see below), so the time grows with the state times the number of questions.
 - **CPU:** not measured by Ollaya. The author reports about 0.6 s per short decision on a 32- or 48-thread CPU server.
 
 ## How it works

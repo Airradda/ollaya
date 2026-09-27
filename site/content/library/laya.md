@@ -90,7 +90,7 @@ curl http://localhost:11435/api/decide -d '{
 
 ## Performance
 
-On an RTX 4090 at fp16, a request with five questions takes 16.3 ms on `laya:en` and 9.1 ms on `laya:multilingual` (median, Ollaya's Phase 0 benchmark).
+On an RTX 4090 at fp16, a request with five questions takes 9.6 ms on `laya:en` and 8.1 ms on `laya:multilingual` at the median, end to end through the HTTP API.
 
 Figures published on the Laya model card, measured on an NVIDIA Tesla T4:
 
@@ -100,7 +100,7 @@ Figures published on the Laya model card, measured on an NVIDIA Tesla T4:
 | Laya multilingual | 32.8 ms | 72.3 ms | – |
 | TypeSafe Jev | 236–276 ms p50 (third-party) | – | 0.246 |
 
-On batched calls `laya:multilingual` is up to ~2.2× faster than `laya:en`; for a single question the two are close. `laya:typed-decisions` reaches 0.766 accuracy on typed-decisions, against 0.727 published for Jev 1.13. Jev latencies come from [AbdelStark/jev-benchmarks](https://github.com/AbdelStark/jev-benchmarks) and [nibzard/decision-model-benchmark](https://github.com/nibzard/decision-model-benchmark); setups differ.
+On batched calls `laya:multilingual` is up to ~2.2× faster than `laya:en`; for a single question the two are close. `laya:typed-decisions` reaches 0.766 accuracy on typed-decisions, against 0.727 published for Jev 1.13 on the Laya card (Winnow's benchmark report has 0.738 for Jev on the same questions). Jev latencies come from [AbdelStark/jev-benchmarks](https://github.com/AbdelStark/jev-benchmarks) and [nibzard/decision-model-benchmark](https://github.com/nibzard/decision-model-benchmark); setups differ.
 
 ## ONNX export
 

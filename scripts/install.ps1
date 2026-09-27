@@ -247,7 +247,8 @@ function Install-Ollaya {
     } elseif ($gpu.State -eq 'none') {
         Write-Host '>>> No NVIDIA GPU found; Ollaya will run on the CPU'
     }
-    Write-Host '>>> Get started:  ollaya run laya'
+    # winnow:e4b (the recommended model) with the GPU pack; laya, which is fast on any CPU, otherwise.
+    Write-Host ">>> Get started:  ollaya run $(if ($downloadCuda -or $keepCuda) { 'winnow:e4b' } else { 'laya' })"
 }
 
 Install-Ollaya

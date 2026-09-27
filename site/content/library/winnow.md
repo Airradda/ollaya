@@ -9,11 +9,12 @@ Winnow is a pair of open decision models by EldanRing, fine-tuned from Google De
 | `winnow:latest`, `winnow:12b` | Gemma 4 12B IT | Q8_0 GGUF, 12.7 GB | 85.7 % | 81.5 % |
 | `winnow:e4b` | Gemma 4 E4B IT | Q8_0 GGUF, 8.0 GB | 80.5 % | 72.7 % |
 
-The accuracies are the author's, measured with the author's server on the same Q8_0 files (model cards of [Winnow-12B](https://huggingface.co/EldanRing/Winnow-12B) and [Winnow-E4B](https://huggingface.co/EldanRing/Winnow-E4B)). For comparison, the author reports 85.7 % and 87.0 % for Jev 1.13 on the same two sets. On typed-decisions (all 400 states, argmax against the majority label), measured by Ollaya, `winnow:12b` scores 0.702 and `winnow:e4b` 0.722.
+The accuracies are the author's, measured with the author's server on the same Q8_0 files (model cards of [Winnow-12B](https://huggingface.co/EldanRing/Winnow-12B) and [Winnow-E4B](https://huggingface.co/EldanRing/Winnow-E4B)). For comparison, the author reports 85.7 % and 87.0 % for Jev 1.13 on the same two sets. On typed-decisions (all 400 states, argmax against the majority label), measured by Ollaya, `winnow:12b` scores 0.702 and `winnow:e4b` 0.722. With its speed, that makes `winnow:e4b` Ollaya's recommended model.
 
 ## Usage
 
 ```shell
+ollaya run winnow:e4b --preset triage "My order never arrived and support ignores me. Refund me today or I'm switching to your competitor."
 ollaya run winnow --preset triage "My order never arrived and support ignores me. Refund me today or I'm switching to your competitor."
 ```
 
@@ -21,7 +22,7 @@ Point any TypeSafe client at `http://localhost:11435` and set the model to `winn
 
 ## Speed
 
-- **RTX 4090, in the runner:** five questions with a short state take about 154 ms on `12b` and 96 ms on `e4b` at the median, without the HTTP layer.
+- **RTX 4090, through the HTTP API:** the triage preset (five questions) on a short customer message takes 89 ms on `e4b` and 131 ms on `12b` at the median of 15 warm requests. On the parity fixtures, measured in the runner, the medians are 96 ms and 154 ms.
 - **CPU:** `e4b` takes about 5.1 s for the same request on a 24-core x86 CPU. Use a GPU.
 
 ## How it works

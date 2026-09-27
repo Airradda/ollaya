@@ -6,7 +6,7 @@ import { catalog, comingNext, featuredTags, fullName } from '../data/catalog'
 import { GITHUB_URL, LOCAL_API } from '../site'
 
 const sections = [
-  { id: 'fast', label: 'Fast' },
+  { id: 'fast', label: 'Fast and accurate' },
   { id: 'compatible', label: 'Drop-in compatible' },
   { id: 'models', label: 'Open models' },
   { id: 'private', label: 'Your data stays yours' },
@@ -84,20 +84,24 @@ function Hero() {
   )
 }
 
-// Real output of the command shown, run on an RTX 4090 through the CLI (`--verbose` timings): decider:2b
-// answered the agent preset's four questions in 178 ms (median of ten warm runs). The first line holds
-// the prompt; the others hang under it, and a JSON line that wraps on a phone continues under its key.
-const MOCK_COMMAND = [
-  "ollaya run decider --preset agent '{",
-  '  "request": "Fix the typo in README.md",',
-  '  "command": "git push --force origin main"',
-  "}'",
+// Real output of the command shown (the default triage preset), run on an RTX 4090 through the CLI
+// with `--verbose` timings: winnow:e4b answered its five questions in 87 ms (median of ten warm
+// runs). The first line holds the prompt; the others hang under it.
+// The command, then the state: a quoted message that continues on the next lines. Short lines, so
+// nothing wraps on a phone.
+const MOCK_COMMAND = 'ollaya run winnow:e4b \\'
+const MOCK_MESSAGE = [
+  '"Third time this year you\'ve',
+  'double-charged me. Refund it',
+  'today or I\'m cancelling and',
+  'moving to a competitor."',
 ]
 const mockRows = [
-  { q: 'action', a: 'block', p: 0.53 },
-  { q: 'on_task', a: 'no', p: 0.75 },
-  { q: 'risk', a: '1.23 / 2', note: 'could lose local work', p: 0.15 },
-  { q: 'destructive', a: 'yes', p: 0.9 },
+  { q: 'intent', a: 'refund', p: 0.91 },
+  { q: 'is_urgent', a: 'yes', p: 0.92 },
+  { q: 'frustration', a: '2.89 / 3', note: 'very angry', p: 0.86 },
+  { q: 'refund_requested', a: 'yes', p: 0.99 },
+  { q: 'churn_risk', a: 'yes', p: 0.99 },
 ]
 
 /** One command line: the prompt in its own column, so continuation lines hang under the command. */
@@ -127,9 +131,12 @@ function TerminalMock() {
         </div>
         <div class="p-4 font-mono text-[12.5px] leading-6 text-fg sm:p-5 sm:text-[13px]">
           <PromptLine>
-            {MOCK_COMMAND.map((line, i) => (
-              <pre class={i ? 'pl-[4ch] -indent-[2ch] whitespace-pre-wrap' : 'whitespace-pre-wrap'}>
-                <Code code={line} lang="shell" />
+            <pre class="whitespace-pre-wrap">
+              <Code code={MOCK_COMMAND} lang="shell" />
+            </pre>
+            {MOCK_MESSAGE.map((line, i) => (
+              <pre class={`whitespace-pre-wrap ${i ? 'pl-[3ch]' : 'pl-[2ch]'}`}>
+                <span class="tok-string">{line}</span>
               </pre>
             ))}
           </PromptLine>
@@ -145,7 +152,7 @@ function TerminalMock() {
             <tbody>
               {mockRows.map((r, i) => (
                 <tr class="term-row" style={`--row:${i}`}>
-                  <td class="w-[18ch] py-0.5 pr-4 align-middle text-muted">{r.q}</td>
+                  <td class="w-[18ch] py-0.5 pr-4 align-middle whitespace-nowrap text-muted">{r.q}</td>
                   <td class="py-0.5 pr-4 align-middle font-medium whitespace-nowrap">
                     {r.a}
                     {r.note ? <span class="hidden font-normal text-muted sm:inline">{`  ${r.note}`}</span> : null}
@@ -165,7 +172,7 @@ function TerminalMock() {
               ))}
             </tbody>
           </table>
-          <div class="term-row mt-4" style="--row:5">
+          <div class="term-row mt-4" style={`--row:${mockRows.length}`}>
             <PromptLine>
               <span class="term-cursor inline-block h-[1.15em] w-[1ch] translate-y-[0.2em] bg-fg/80" aria-hidden="true"></span>
             </PromptLine>
@@ -173,7 +180,7 @@ function TerminalMock() {
         </div>
       </div>
       <figcaption class="mt-3 text-center text-xs text-muted lg:absolute lg:inset-x-0 lg:top-full">
-        Real output: <span class="font-mono">decider:2b</span> answered in 178 ms on an RTX 4090.
+        Real output: <span class="font-mono">winnow:e4b</span> answered five questions in 87 ms on an RTX 4090.
       </figcaption>
     </figure>
   )
@@ -206,21 +213,32 @@ function Section({
   )
 }
 
-// Median end-to-end latency of a five-question request through the HTTP API, on an RTX 4090 (fp16 for
-// laya, fp32 for the others). Jev: the hosted API's median request in third-party benchmarks.
-const latency = [
-  { label: 'laya:multilingual', ms: 8.1, text: '8.1 ms' },
-  { label: 'laya:en', ms: 9.6, text: '9.6 ms' },
-  { label: 'gliclass', ms: 14.7, text: '14.7 ms' },
-  { label: 'nli', ms: 20.4, text: '20.4 ms' },
-  { label: 'decider:0.8b', ms: 155, text: '155 ms' },
-  { label: 'decider:2b', ms: 190, text: '190 ms' },
+// Accuracy: the typed-decisions test split (400 states, 2,000 questions, argmax against the
+// majority label), as published on each model's page; Jev's is from Winnow's benchmark report on
+// the same 2,000 questions. Latency: median of 15 warm five-question requests (the triage preset on
+// the hero's message) through the HTTP API on an RTX 4090, each model in its shipped precision;
+// Jev's is the hosted API's median request in third-party benchmarks, network included.
+// laya:typed-decisions (0.766) is left out: it was fine-tuned on this dataset.
+const scoreboard: { tag: string; acc: number; ms: number; pick?: boolean }[] = [
+  { tag: 'winnow:e4b', acc: 0.722, ms: 89, pick: true },
+  { tag: 'kev:9b', acc: 0.722, ms: 498 },
+  { tag: 'winnow:12b', acc: 0.702, ms: 131 },
+  { tag: 'decider:4b', acc: 0.68, ms: 520 },
+  { tag: 'kev:4b', acc: 0.669, ms: 354 },
+  { tag: 'jevk5:4b', acc: 0.625, ms: 105 },
+  { tag: 'decider:2b', acc: 0.591, ms: 190 },
+  { tag: 'nli', acc: 0.548, ms: 20 },
+  { tag: 'decider:0.8b', acc: 0.506, ms: 155 },
+  { tag: 'gliclass', acc: 0.477, ms: 15 },
+  { tag: 'kev:0.8b', acc: 0.46, ms: 128 },
+  { tag: 'von', acc: 0.447, ms: 23 },
+  { tag: 'laya:en', acc: 0.361, ms: 10 },
 ]
-const JEV = { label: 'TypeSafe Jev', note: 'hosted API', from: 236, to: 276, text: '236–276 ms' }
-const LATENCY_SCALE = 300
-const AXIS = [0, 100, 200, 300]
-
-const pct = (n: number) => `${((n / LATENCY_SCALE) * 100).toFixed(2)}%`
+const JEV = { acc: 0.738, text: '236–276 ms' }
+const ACC_SCALE = 0.8
+const ACC_AXIS = [0, 0.2, 0.4, 0.6, 0.8]
+const accPct = (a: number) => `${((a / ACC_SCALE) * 100).toFixed(2)}%`
+const msText = (ms: number) => `${ms} ms`
 
 function Stat({ value, unit, label, detail, muted }: { value: string; unit: string; label: string; detail: string; muted?: boolean }) {
   return (
@@ -237,63 +255,74 @@ function Stat({ value, unit, label, detail, muted }: { value: string; unit: stri
   )
 }
 
+/** One scoreboard row: the tag, an accuracy bar with its value, and the latency. */
+function ScoreRow({ label, note, acc, latency, pick, muted }: { label: string; note?: string; acc: number; latency: string; pick?: boolean; muted?: boolean }) {
+  return (
+    <li class="contents">
+      <span class="flex h-9 flex-col justify-center leading-tight">
+        <span class={`font-mono text-xs sm:text-[13px] ${muted ? 'font-sans text-body' : 'text-fg'} ${pick ? 'font-semibold' : ''}`}>{label}</span>
+        {note ? <span class="text-xs text-muted">{note}</span> : null}
+      </span>
+      <span class="relative flex h-9 items-center">
+        <span class={`h-2.5 min-w-1 rounded-full ${muted ? 'bg-bar-muted' : 'lat-bar'}`} style={`width:${accPct(acc)}`}></span>
+        <span class={`ml-2.5 text-[13px] whitespace-nowrap tabular-nums ${muted ? 'text-body' : 'font-medium text-fg'}`}>{acc.toFixed(3)}</span>
+      </span>
+      <span class={`flex h-9 items-center justify-end text-[13px] whitespace-nowrap tabular-nums ${muted ? 'text-body' : 'text-fg'} ${pick ? 'font-semibold' : ''}`}>
+        {latency}
+      </span>
+    </li>
+  )
+}
+
 function Fast() {
   return (
     <Section
       id="fast"
-      title="Fast"
-      lead="Decisions in milliseconds."
-      body="A decision model answers in a single forward pass, with no token-by-token generation. On your own GPU, a five-question request to Laya takes about 10 ms, end to end through the HTTP API."
+      title="Fast and accurate"
+      lead="Close to Jev's accuracy, in under 100 ms."
+      body="A decision model answers in a single forward pass, with no token-by-token generation. On an RTX 4090, winnow:e4b answers a five-question request in 89 ms end to end, and scores 0.722 on typed decisions against 0.738 for TypeSafe's hosted Jev. Smaller models such as laya answer in about 10 ms, and run well on a CPU."
     >
       <div class="grid overflow-hidden rounded-2xl border border-line sm:grid-cols-2">
-        <Stat value="8–10" unit="ms" label="Laya on Ollaya" detail="RTX 4090, five questions, end to end" />
+        <Stat value="89" unit="ms" label="winnow:e4b on Ollaya" detail="RTX 4090, five questions · 0.722 accuracy" />
         <div class="border-t border-line sm:border-t-0 sm:border-l">
-          <Stat value="236–276" unit="ms" label="TypeSafe Jev" detail="Hosted API, median request" muted />
+          <Stat value="236–276" unit="ms" label="TypeSafe Jev" detail="Hosted API, median request · 0.738 accuracy" muted />
         </div>
       </div>
 
       <figure class="mt-14">
         <figcaption class="text-sm font-medium text-fg">
-          Every model, one scale <span class="font-normal text-muted">· median latency, lower is better</span>
+          Accuracy and speed of every model{' '}
+          <span class="font-normal text-muted">· typed-decisions accuracy, higher is better; latency, lower is better</span>
         </figcaption>
-        <div class="mt-6 grid grid-cols-[8.25rem_minmax(0,1fr)] gap-x-3 sm:grid-cols-[9.5rem_minmax(0,1fr)] sm:gap-x-4">
+        <div class="mt-6 grid grid-cols-[6.5rem_minmax(0,1fr)_5.25rem] gap-x-3 sm:grid-cols-[9.5rem_minmax(0,1fr)_5.5rem] sm:gap-x-4">
+          <span class="text-xs text-muted">Model</span>
+          <span class="text-xs text-muted">Accuracy</span>
+          <span class="text-right text-xs text-muted">Latency</span>
           <ul class="contents" role="list">
-            {latency.map((r) => (
-              <li class="contents">
-                <span class="flex h-9 items-center font-mono text-xs text-fg sm:text-[13px]">{r.label}</span>
-                <span class="relative flex h-9 items-center">
-                  <span class="lat-bar h-2.5 min-w-1 rounded-full" style={`width:${pct(r.ms)}`}></span>
-                  <span class="ml-2.5 text-[13px] font-medium whitespace-nowrap text-fg tabular-nums">{r.text}</span>
-                </span>
-              </li>
+            <ScoreRow label="TypeSafe Jev" note="hosted API" acc={JEV.acc} latency={JEV.text} muted />
+            {scoreboard.map((r) => (
+              <ScoreRow label={r.tag} acc={r.acc} latency={msText(r.ms)} pick={r.pick} />
             ))}
-            <li class="contents">
-              <span class="flex h-9 flex-col justify-center text-[13px] leading-tight">
-                <span class="text-body">{JEV.label}</span>
-                <span class="text-xs text-muted">{JEV.note}</span>
-              </span>
-              <span class="relative flex h-9 items-center">
-                <span class="h-2.5 rounded-l-full bg-bar-muted" style={`width:${pct(JEV.from)}`}></span>
-                <span class="h-2.5 rounded-r-full bg-bar-muted opacity-50" style={`width:${pct(JEV.to - JEV.from)}`}></span>
-                <span class="ml-2.5 text-[13px] whitespace-nowrap text-body tabular-nums">{JEV.text}</span>
-              </span>
-            </li>
           </ul>
           <span></span>
           <span class="relative mt-2 h-5 border-t border-line text-[11px] text-muted tabular-nums" aria-hidden="true">
-            {AXIS.map((t) => (
+            {ACC_AXIS.map((t) => (
               <span
-                class={`absolute top-1.5 whitespace-nowrap ${t === 0 ? '' : t === LATENCY_SCALE ? '-translate-x-full' : '-translate-x-1/2'}`}
-                style={`left:${pct(t)}`}
+                class={`absolute top-1.5 whitespace-nowrap ${t === 0 ? '' : t === ACC_SCALE ? '-translate-x-full' : '-translate-x-1/2'}`}
+                style={`left:${accPct(t)}`}
               >
-                {t === LATENCY_SCALE ? `${t} ms` : t}
+                {t === 0 ? '0' : t.toFixed(1)}
               </span>
             ))}
           </span>
+          <span></span>
         </div>
         <p class="mt-8 max-w-2xl text-[13px] leading-relaxed text-muted">
-          Ollaya: median of a five-question request through the HTTP API on an NVIDIA RTX 4090 (laya in fp16, the
-          others in fp32). Jev: median request latency of the hosted API in third-party benchmarks (
+          Accuracy: the typed-decisions test split (400 states, 2,000 questions), argmax against the majority label,
+          measured by Ollaya for each model; Jev's from Winnow's benchmark report on the same questions.{' '}
+          <span class="font-mono">laya:typed-decisions</span> scores 0.766 but was fine-tuned on this dataset, so it is
+          left out. Latency: median of a five-question request through the HTTP API on an NVIDIA RTX 4090; Jev: median
+          request of the hosted API in third-party benchmarks (
           <a href="https://github.com/AbdelStark/jev-benchmarks" class={textLink}>
             AbdelStark/jev-benchmarks
           </a>
@@ -301,7 +330,7 @@ function Fast() {
           <a href="https://github.com/nibzard/decision-model-benchmark" class={textLink}>
             nibzard/decision-model-benchmark
           </a>
-          ), which includes the network. Setups differ, so read it as an order-of-magnitude comparison.
+          ), which includes the network. Setups differ, so read the latencies as an order-of-magnitude comparison.
         </p>
       </figure>
     </Section>
@@ -311,11 +340,11 @@ function Fast() {
 const compatRequest = `# Point the TypeSafe SDK at Ollaya
 export TYPESAFE_BASE_URL=${LOCAL_API}
 export TYPESAFE_API_KEY=local        # any value works
-export TYPESAFE_DEFAULT_MODEL=laya
+export TYPESAFE_DEFAULT_MODEL=winnow:e4b
 
 # …or call the compatible endpoint directly
 curl ${LOCAL_API}/v1/systemone -d '{
-    "model": "laya",
+    "model": "winnow:e4b",
     "state": "Can I get an invoice for last month?",
     "questions": {
       "intent": {
@@ -331,21 +360,21 @@ curl ${LOCAL_API}/v1/systemone -d '{
   }'`
 
 const compatResponse = `{
-  "model": "laya:en",
+  "model": "winnow:e4b",
   "answers": {
     "intent": {
       "type": "choice",
       "choice": "invoice",
-      "confidence": 0.9547,
+      "confidence": 0.9801,
       "probabilities": {
-        "invoice": 0.9698,
-        "refund": 0.0172,
-        "other": 0.013
+        "invoice": 0.9868,
+        "refund": 0.0026,
+        "other": 0.0106
       }
     }
   },
   "usage": {
-    "input_tokens": 43,
+    "input_tokens": 120,
     "output_tokens": 0
   }
 }`
@@ -412,7 +441,7 @@ function OpenModels() {
       lead="Open weights, ready to pull."
       body={
         laya
-          ? 'Pick by what you need: laya is the fastest, decider the most accurate, von reads up to 8,192 tokens, and qwen3guard screens text for safety. The models page shows each one’s accuracy and speed.'
+          ? 'Pick by what you need: winnow:e4b balances accuracy and speed best, laya is the fastest and runs well on a CPU, kev and decider scale up to 9B and 4B, von reads up to 8,192 tokens, and qwen3guard screens text for safety. The models page shows each one’s accuracy and speed.'
           : 'Open decision models from their authors, pulled by name.'
       }
     >
@@ -612,7 +641,7 @@ function Closer() {
         Get up and running in minutes.
       </h2>
       <p class="mx-auto mt-3 max-w-md text-body">
-        One binary, one command: <code class="font-mono text-[0.9em] text-fg">ollaya run laya</code>.
+        One binary, one command: <code class="font-mono text-[0.9em] text-fg">ollaya run winnow:e4b</code>.
       </p>
       <div class="mt-8 flex justify-center">
         <a href="/download" class={btnPrimary}>

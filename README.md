@@ -25,16 +25,21 @@ changing one environment variable.
 
 ```sh
 curl -fsSL https://ollaya.dev/install.sh | sh
-ollaya run laya --preset triage "Your app crashed during checkout and I was charged twice. Please refund one of the charges."
+ollaya run winnow:e4b --preset triage "Third time this year you've double-charged me. Refund it today or I'm cancelling and moving to a competitor."
 ```
 
 ```
-intent            refund                                ████████████████ 0.98
-is_urgent         no                                    ███████████████░ 0.93
-frustration       1.46 / 3  concerned but civil         ██████░░░░░░░░░░ 0.36
-refund_requested  yes                                   ████████████░░░░ 0.76
-churn_risk        no                                    ███████████████░ 0.92
+intent            refund                                ███████████████░ 0.91
+is_urgent         yes                                   ███████████████░ 0.92
+frustration       2.89 / 3  very angry or using stron…  ██████████████░░ 0.86
+refund_requested  yes                                   ████████████████ 0.99
+churn_risk        yes                                   ████████████████ 0.99
 ```
+
+`winnow:e4b` is the recommended model: 0.722 accuracy on typed decisions (TypeSafe's Jev: 0.738)
+and 89 ms for these five questions on an RTX 4090. It is a 4B-class language model, so without an
+NVIDIA GPU start with `laya`, which answers in a fraction of a second on a CPU. All models and their
+numbers: [ollaya.dev/search](https://ollaya.dev/search).
 
 ## Features
 
@@ -75,18 +80,19 @@ churn_risk        no                                    ████████
 
 | Model | What it is |
 |---|---|
+| `winnow:e4b` | **Recommended.** EldanRing's Winnow-E4B, a Gemma 4 fine-tune run from the author's Q8_0 GGUF on llama.cpp: 0.722 on typed-decisions (Jev: 0.738), 89 ms for five questions on an RTX 4090 |
 | `laya` | Router: picks `laya:en` or `laya:multilingual` by language |
 | `laya:en` | English decision model (ModernBERT-large, 421M). The fastest: 8–10 ms for five questions on an RTX 4090 |
 | `laya:multilingual` | 100+ languages (mmBERT-base, 322M) |
 | `laya:typed-decisions` | Fine-tuned on the typed-decisions workflows |
 | `decider`, `decider:4b`, `decider:0.8b` | Mapika's Qwen3.5 decoders, 2B (the default), 4B and 0.8B: 0.680 on typed-decisions for 4B, 0.591 for 2B |
-| `kev`, `kev:4b`, `kev:9b` | Jared Palmer's Kev: a LoRA and a pointer head on Qwen3.5 (0.8B by default, 4B, 9B), calibrated. `kev:9b` scores 0.722 on typed-decisions, the most of the models not trained on it |
+| `kev`, `kev:0.8b`, `kev:9b` | Jared Palmer's Kev: a LoRA and a pointer head on Qwen3.5 (4B by default, 0.8B, 9B), calibrated. `kev:4b` scores 0.669 on typed-decisions and `kev:9b` 0.722, as much as `winnow:e4b` |
 | `decision` | Decision 1.0 Eos by the vLLM Semantic Router contributors: a fine-tuned Qwen3.5-0.8B with an endpoint head, 16k-token rows |
 | `qwen3guard` | Qwen3Guard-Gen-0.6B safety guard with built-in questions: safe, controversial or unsafe, and the category |
 | `nli`, `nli:modernbert-large` | Moritz Laurer's zero-shot NLI classifiers (DeBERTa-v3-large, ModernBERT-large) |
 | `gliclass` | Knowledgator's instruction-following zero-shot classifier (DeBERTa-v3-large) |
 | `von` | Victor Hugo Panisa's Von 1.1 (ModernBERT-large): every option scored at its own marker, 8k-token context |
-| `winnow`, `winnow:e4b` | EldanRing's Winnow-12B and Winnow-E4B, Gemma 4 fine-tunes run from the author's Q8_0 GGUF on llama.cpp |
+| `winnow` | EldanRing's Winnow-12B, the larger sibling of `winnow:e4b`: 0.702 on typed-decisions |
 | `jevk5` | alibiserikbay's JevK5 v0.3, a Qwen3.5-4B fine-tune run from the author's Q8_0 GGUF on llama.cpp, up to 16 options |
 
 Browse them at [ollaya.dev/search](https://ollaya.dev/search). Laya tags ending in

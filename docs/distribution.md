@@ -442,7 +442,7 @@ What it does:
    writes `/etc/systemd/system/ollaya.service`, enables it and restarts it. Then it waits up to 15 s
    for `GET /` to answer `Ollaya is running`. If any of those conditions is missing, it says why it
    skipped the service.
-8. **Prints next steps:** `ollaya run laya`, or `ollaya serve` first when there's no service.
+8. **Prints next steps:** `ollaya run winnow:e4b` when it installed a GPU pack, `ollaya run laya` otherwise.
 
 Models for the service live in `/usr/share/ollaya/.ollaya/models` (`OLLAYA_MODELS` in the unit). To
 change settings, run `sudo systemctl edit ollaya` and add `Environment=` lines.

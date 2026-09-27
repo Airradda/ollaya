@@ -24,17 +24,17 @@ TypeSafe's closed Jev model created the decision-model category. Ollaya serves o
 
 ## Which models can I run?
 
-Open decision models from these families. See [Models](/search).
+Open decision models from these families. See [Models](/search), which compares their accuracy and speed.
 
+- **`winnow`** from EldanRing: Winnow-E4B (`winnow:e4b`, the recommended model) and Winnow-12B (`winnow`), Gemma 4 fine-tunes published as GGUF files. Ollaya runs the author's file on llama.cpp, on an NVIDIA GPU, Apple silicon's GPU or the CPU. `winnow:e4b` scores 0.722 on typed decisions, close to Jev's 0.738, in about 90 ms on an RTX 4090.
 - **`laya`** from Convai Innovations: `laya` (a router), `laya:en`, `laya:multilingual` and `laya:typed-decisions`, each also as `-fp16` and `-fp32`. `laya` sends English text to `laya:en` and other languages, Turkish for example, to `laya:multilingual`. It is the fastest.
-- **`decider`** from Mapika: `decider:4b`, `decider:2b` and `decider:0.8b`, built on Qwen3.5. With `kev:4b` and `kev:9b` these are the most accurate, and the slowest.
+- **`decider`** from Mapika: `decider:4b`, `decider:2b` and `decider:0.8b`, built on Qwen3.5. `decider:4b` scores 0.680 on typed decisions.
 - **`nli`** from Moritz Laurer: zero-shot NLI classifiers on DeBERTa-v3-large and ModernBERT-large. It is the most accurate encoder.
 - **`gliclass`** from Knowledgator: an instruction-following zero-shot classifier that scores every option in one pass.
-- **`kev`** from Jared Palmer: `kev:0.8b`, `kev:4b` and `kev:9b`, a LoRA and a pointer head on Qwen3.5 that scores every option at its own span, calibrated.
+- **`kev`** from Jared Palmer: `kev:4b` (`kev`), `kev:0.8b` and `kev:9b`, a LoRA and a pointer head on Qwen3.5 that scores every option at its own span, calibrated. `kev:9b` scores 0.722 on typed decisions, as much as `winnow:e4b`, but needs a 24 GB GPU and takes about 500 ms.
 - **`decision`** from the vLLM Semantic Router contributors: `decision:eos`, Decision 1.0 Eos, a fully fine-tuned Qwen3.5-0.8B with an endpoint head that scores every option at its last token, calibrated, with rows of up to 16,384 tokens.
 - **`qwen3guard`** from the Qwen team: a safety guard in 119 languages. It answers its own built-in questions (safe, controversial or unsafe, and the unsafe category), so you send it only the text.
 - **`von`** from Victor Hugo Panisa: Von 1.1 on ModernBERT-large, which scores every option at its own marker in one pass and reads states of up to 8,192 tokens.
-- **`winnow`** from EldanRing: Winnow-12B (`winnow`) and Winnow-E4B (`winnow:e4b`), Gemma 4 fine-tunes published as GGUF files. Ollaya runs the author's file on llama.cpp, on an NVIDIA GPU, Apple silicon's GPU or the CPU.
 - **`jevk5`** from alibiserikbay: JevK5 v0.3, a Qwen3.5-4B fine-tune published as GGUF files. Ollaya runs the author's 4B Q8_0 file on llama.cpp, with up to 16 options per question.
 
 ## Where do the weights come from?
@@ -47,11 +47,11 @@ Ollaya runs Laya as ONNX. Across 2,383 questions per checkpoint (`en`, `multilin
 
 ## How do the models compare with Jev?
 
-It depends on the model. The small encoders, such as `laya`, are the fastest but fall well below Jev on harder questions; `decider` is more accurate and slower. For an independent comparison of open decision models with Jev, on accuracy and calibration, see the [Decision Index](https://huggingface.co/spaces/multimodalart/jev-decision-index). If you have labelled data for a fixed task, a model fine-tuned on it usually beats any general one.
+It depends on the model. On typed decisions (2,000 questions), `winnow:e4b` and `kev:9b` come closest, with 0.722 against 0.738 for Jev, and `winnow:e4b` answers five questions in about 90 ms on an RTX 4090, faster than Jev's hosted API. The small encoders, such as `laya`, are the fastest but fall well below Jev on harder questions. The [home page](/#fast) lists every model's accuracy and speed. For an independent comparison of open decision models with Jev, on accuracy and calibration, see the [Decision Index](https://huggingface.co/spaces/multimodalart/jev-decision-index). If you have labelled data for a fixed task, a model fine-tuned on it usually beats any general one.
 
 ## How fast is it?
 
-A decision is a single forward pass. Measured end to end through the HTTP API on an RTX 4090, the median request with five questions takes 8 ms with `laya:multilingual` and 10 ms with `laya:en` (fp16), 15 ms with `gliclass` and 20 ms with `nli` (fp32). A single question takes 8–11 ms on any of them.
+A decision is a single forward pass. Measured end to end through the HTTP API on an RTX 4090, the median request with five questions takes 8 ms with `laya:multilingual` and 10 ms with `laya:en` (fp16), 15 ms with `gliclass`, 20 ms with `nli` and 89 ms with `winnow:e4b`. A single question takes 8–11 ms on the encoders. The larger decoders take longer: `kev:4b` 354 ms, `decider:4b` 520 ms.
 
 ## Do I need a GPU?
 

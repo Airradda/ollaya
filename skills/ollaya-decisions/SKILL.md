@@ -56,17 +56,18 @@ If none is available, tell the user how to install Ollaya:
 
 | Model | Strength | Speed (5 questions) |
 |---|---|---|
-| `laya` (default) | English and 100+ languages, routed automatically; calibrated | ~10 ms GPU, ~0.2–0.4 s CPU |
-| `decider` | The most accurate; slower | ~0.2 s GPU, ~1 s CPU |
+| `winnow:e4b` (recommended with an NVIDIA GPU) | The best accuracy for its speed: 0.722 on typed decisions (Jev: 0.738); calibrated | ~90 ms GPU, ~5 s CPU |
+| `laya` (default when `model` is omitted) | English and 100+ languages, routed automatically; calibrated; the fastest | ~10 ms GPU, ~0.2–0.4 s CPU |
+| `kev` | Qwen3.5 decoder with a pointer head, 0.8b to 9b (`kev:9b` 0.722); calibrated | `kev:4b` ~0.35 s GPU |
+| `decider` | Qwen3.5 decoders, 0.8b to 4b (`decider:4b` 0.680) | ~0.2–0.5 s GPU, ~1 s CPU |
 | `nli` | Zero-shot, good at yes/no with clear statements | ~20 ms GPU |
 | `gliclass` | Zero-shot, many options in one pass | ~15 ms GPU |
-| `kev` | Qwen3.5-0.8B decoder with a pointer head; calibrated | ~0.2 s GPU, ~2 s CPU |
 | `decision` | Decision 1.0 Eos: fully fine-tuned Qwen3.5-0.8B with an endpoint head; rows up to 16k tokens; calibrated | ~0.2 s GPU, ~0.85 s CPU |
 | `qwen3guard` | Safety guard; answers only its built-in questions (send no `questions`) | ~40 ms GPU, ~2 s CPU |
 | `von` | ModernBERT-large, every option scored at its own marker; states up to 8k tokens; calibrated | ~25 ms GPU, ~0.8 s CPU |
 
-Start with `laya`. Move to `decider` when accuracy matters more than latency, or when `laya`'s
-confidence is often low on your data.
+With an NVIDIA GPU, start with `winnow:e4b`. Without one, start with `laya`, and move to a larger
+model when `laya`'s confidence is often low on your data.
 
 ## Presets
 

@@ -21,7 +21,7 @@ ollaya run decider:4b --preset triage "My order never arrived and support ignore
 
 ## Speed
 
-- **RTX 4090, end to end:** a five-question request with a short state takes about 155 ms on `0.8b`, 190 ms on `2b` and about 500 ms on `4b` at the median. That is slower than the encoder models (Laya: 8–10 ms). `0.8b` and `2b` are still faster than hosted Jev (236–276 ms).
+- **RTX 4090, end to end:** a five-question request with a short state takes about 155 ms on `0.8b`, 190 ms on `2b` and 520 ms on `4b` at the median. That is slower than the encoder models (Laya: 8–10 ms). `0.8b` and `2b` are still faster than hosted Jev (236–276 ms).
 - **State length:** cost grows with the number of options times the context length.
 - **Memory:** on a 24 GB GPU, `2b` handles states up to about 8k tokens. Longer states spill out of GPU memory and become very slow.
 

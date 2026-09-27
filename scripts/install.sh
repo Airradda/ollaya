@@ -539,13 +539,14 @@ EOF
     elif [ "$NVIDIA_STATE" = none ] && [ "$OS" = Linux ]; then
         status "No NVIDIA GPU found; Ollaya will run on the CPU"
     fi
+    # winnow:e4b (the recommended model) with an NVIDIA GPU; laya, which is fast on any CPU, otherwise.
+    START_MODEL=laya
+    if [ -n "$CUDA_ARCHIVE" ] || $CUDA_KEEP; then START_MODEL=winnow:e4b; fi
     if $SERVICE; then
         status "The Ollaya API is available at http://127.0.0.1:$PORT (systemd service: ollaya)"
-        status "Get started:  ollaya run laya"
-    else
-        # The CLI starts the server in the background when none is running.
-        status "Get started:  ollaya run laya"
     fi
+    # The CLI starts the server in the background when none is running.
+    status "Get started:  ollaya run $START_MODEL"
 }
 
 main "$@"

@@ -116,7 +116,11 @@ export function DownloadPage({ origin }: { origin: string }) {
               </Note>
             </Step>
             <Step title="Run a model">
-              <CodeBlock code="ollaya run laya" />
+              <CodeBlock code="ollaya run winnow:e4b" />
+              <Note>
+                The recommended model: close to Jev's accuracy, in about 90 ms on an NVIDIA GPU (an 8 GB download).
+                Without a GPU, <code class="font-mono">ollaya run laya</code> answers in a fraction of a second on the CPU.
+              </Note>
             </Step>
             <Requirements
               items={[
@@ -155,7 +159,11 @@ export function DownloadPage({ origin }: { origin: string }) {
               </Note>
             </Step>
             <Step title="Run a model">
-              <CodeBlock code="ollaya run laya" />
+              <CodeBlock code="ollaya run winnow:e4b" />
+              <Note>
+                The recommended model: close to Jev's accuracy, in about 90 ms on an NVIDIA GPU (an 8 GB download).
+                Without a GPU, <code class="font-mono">ollaya run laya</code> answers in a fraction of a second on the CPU.
+              </Note>
             </Step>
             <Requirements
               items={[
