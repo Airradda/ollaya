@@ -29,7 +29,8 @@ def _laya(sub, description, params, ctx, languages, mlx=False):
         "checkpoint": os.path.join(DEFAULT_ROOT, prefix, "model.safetensors"),
         "prefix": "model.",
         "exports": {
-            "fp32": os.path.join(OUT, "laya-" + slug),
+            # fp32: the opset-23 export (fused Attention, CPU); fp16: derived from the opset-20 one.
+            "fp32": os.path.join(OUT, "laya-%s-o23" % slug),
             "fp16": os.path.join(OUT, "laya-%s-fp16" % slug),
         },
         "parameter_size": params,

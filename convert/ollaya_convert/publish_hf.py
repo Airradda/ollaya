@@ -70,7 +70,11 @@ The checks use typed-decisions plus multilingual and edge cases:
 
 - **fp32:** the same decision on 100% of questions, with probabilities within 1.1e-4.
 - **fp16:** the same decision on 99.1–99.6% of questions. Nearly all of the differences are
-  near-ties between the top two options."""
+  near-ties between the top two options.
+
+The fp32 graphs (CPU) are opset 23: attention runs as fused `Attention` nodes, which ONNX Runtime's
+CPU provider runs faster than the decomposed ops, so they need ONNX Runtime 1.23 or newer. The fp16
+graphs (GPU) are opset 20."""
 
 
 def main():

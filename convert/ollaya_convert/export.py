@@ -1,6 +1,12 @@
 """Export a Laya checkpoint (encoder + decision head + marker gather) to a single ONNX graph.
 
-    uv run python -m ollaya_convert.export en --out out/laya-en
+    uv run python -m ollaya_convert.export en --out out/laya-en-o23                  # CPU graph (fp32)
+    OLLAYA_OPSET=20 uv run python -m ollaya_convert.export en --out out/laya-en      # source of the fp16 GPU graph
+
+The CPU graph is opset 23: attention is one fused `Attention` node, which ONNX Runtime's CPU
+provider runs faster than the decomposed opset-20 ops, most of all on long inputs (#6). It needs
+ONNX Runtime 1.23 or newer; every Ollaya release links 1.28. The fp16 GPU graph (`fp16.py`) is
+still derived from the opset-20 export, because only that one has passed parity in fp16.
 
 Inputs (all dynamic along questions `q`, sequence `s` and markers `k`):
     input_ids      int64 [q, s]
@@ -26,10 +32,11 @@ from . import laya_ref
 
 INPUT_NAMES = ["input_ids", "attention_mask", "marker_pos", "marker_mask", "qtype"]
 OUTPUT_NAMES = ["logits", "act_logits"]
-OPSET = int(os.environ.get("OLLAYA_OPSET", "20"))
+OPSET = int(os.environ.get("OLLAYA_OPSET", "23"))
 # "1": torch.onnx's optimizer (constant folding, then onnxscript's fusions for the opset);
 # "fold": the same constant folding and clean-up without the fusions; "0": the graph as translated.
-OPTIMIZE = os.environ.get("OLLAYA_ONNX_OPTIMIZE", "1")
+# Opset 23 defaults to "fold": onnxscript's RotaryEmbedding fusion is left off (#6).
+OPTIMIZE = os.environ.get("OLLAYA_ONNX_OPTIMIZE", "fold" if OPSET >= 23 else "1")
 # DecisionModel.forward picks topk(2) vs a zero-padded topk(1) with a Python `if` on the marker
 # width, so the exported graph always takes topk(2). Runtimes pad the marker axis to at least this
 # many slots; a masked slot scores -1e4, so probabilities, entropy and k are unchanged.
