@@ -304,7 +304,7 @@ main() {
         # The release lists the sha256 of every CUDA library (ollaya-<platform>-cuda.sha256, also
         # installed as FILES.sha256). When the installed libraries match it, keep them instead of
         # downloading the same ~1 GB again. Releases before 0.4.0 have no such file.
-        CUDA_SUFFIX= CUDA_SIZE="about 1 GB"
+        CUDA_SUFFIX='' CUDA_SIZE="about 1 GB"
         [ "$CUDA_PACK" = cuda_v13 ] || CUDA_SUFFIX=12 CUDA_SIZE="about 1.6 GB"
         CUDA_DIR=$PREFIX/lib/ollaya/$CUDA_PACK
         CUDA_FILES=ollaya-$PLATFORM-cuda$CUDA_SUFFIX.sha256
