@@ -4,8 +4,8 @@ Kev is a family of decision models by [Jared Palmer](https://huggingface.co/jare
 
 | Tag | Base | Checkpoint | Params | Typed-decisions accuracy | Out-of-domain (upstream) |
 |---|---|---|---|---|---|
-| `kev:latest`, `kev:0.8b` | Qwen3.5-0.8B | round 15 | 0.76B | 0.460 | 0.697 |
-| `kev:4b` | Qwen3.5-4B | round 10 | 4.2B | 0.669 | 0.838 |
+| `kev:0.8b` | Qwen3.5-0.8B | round 15 | 0.76B | 0.460 | 0.697 |
+| `kev:latest`, `kev:4b` | Qwen3.5-4B | round 10 | 4.2B | 0.669 | 0.838 |
 | `kev:9b` | Qwen3.5-9B | 2026-09-21 | 7.9B | **0.722** | 0.852 |
 
 Typed-decisions accuracy is the argmax against the majority label on all 400 typed-decisions states. For comparison, `decider:2b` scores 0.591, `nli` 0.548 and `laya:en` 0.361. The labels have low annotator agreement, so compare the numbers against each other rather than reading them as absolutes. The last column is upstream's locked out-of-domain test (transfer-v4); Jev scores 0.857 on its development items.
@@ -17,10 +17,11 @@ ollaya run kev --preset triage "My order never arrived and support ignores me. R
 ollaya run kev:9b --preset triage "My order never arrived and support ignores me. Refund me today or I'm switching to your competitor."
 ```
 
-Point any TypeSafe client at `http://localhost:11435` and set the model to `kev`, `kev:4b` or `kev:9b`.
+Point any TypeSafe client at `http://localhost:11435` and set the model to `kev` (the same as `kev:4b`), `kev:0.8b` or `kev:9b`. Before 2026-09-27, `kev` meant `kev:0.8b`.
 
 ## Speed
 
+- **RTX 4090, through the HTTP API:** the triage preset (five questions) on a short message takes 128 ms on `0.8b`, 354 ms on `4b` and 498 ms on `9b` at the median of 15 warm requests.
 - **State length:** every question reads the whole state again, so the cost grows with the number of questions times the state length.
 - **CPU:** `0.8b` takes about 2 s for five questions with a short state on a 24-core x86 CPU. `4b` and `9b` belong on a GPU.
 

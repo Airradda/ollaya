@@ -234,7 +234,7 @@ CATALOG = {
                       license_text=_kev_license("kev-9b", "Qwen3.5-9B-Base"),
                       weights=_kev_weights("Qwen/Qwen3.5-9B-Base", "68c46c4b3498877f3ef123c856ecfde50c39f404", 4)),
         },
-        "aliases": {"latest": "0.8b"},
+        "aliases": {"latest": "4b"},
         "parity": "Ollaya's Rust runtime matches upstream Kev (PyTorch fp32) exactly on 480 questions from 117 "
                   "requests per checkpoint, and rejects the same 16 requests upstream rejects. The token rows and "
                   "option positions are identical, and so is the decision on every question. Probabilities are "
