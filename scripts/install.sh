@@ -225,6 +225,8 @@ main() {
     NVIDIA_STATE=none
     CUDA_DRIVER=
     CUDA_PACK=cuda_v13
+    # The largest GPU's memory in MiB (nvidia-smi), for the model the summary suggests.
+    GPU_MIB=
     nvidia_smi=
     if [ "$OS" = Linux ]; then
         if [ "$WSL" = 2 ]; then
@@ -267,6 +269,8 @@ main() {
                 # run. The lowest compute capability of the host's cards decides, because a
                 # machine with an old and a new card is only as fast as the oldest. compute_cap
                 # is N/A only on drivers older than about R510, which never match here.
+                GPU_MIB=$("$nvidia_smi" --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null |
+                    sed -n 's/^ *\([0-9][0-9]*\).*/\1/p' | sort -n | tail -n 1)
                 min_cap=$("$nvidia_smi" --query-gpu=compute_cap --format=csv,noheader 2>/dev/null |
                     sed -n 's/^ *\([0-9][0-9]*\)\.\([0-9]\).*/\1\2/p' | sort -n | head -n 1)
                 if [ "$NVIDIA_STATE" = ready ] && [ -n "$min_cap" ] && [ "$min_cap" -lt 75 ] &&
@@ -554,9 +558,12 @@ EOF
     elif [ "$NVIDIA_STATE" = none ] && [ "$OS" = Linux ]; then
         status "No NVIDIA GPU found; Ollaya will run on the CPU"
     fi
-    # winnow:e4b (the recommended model) with an NVIDIA GPU; laya, which is fast on any CPU, otherwise.
+    # winnow:e4b (the recommended model, 8 GB) with an NVIDIA GPU that holds it; laya, which is
+    # fast on any CPU and on small GPUs, otherwise.
     START_MODEL=laya
-    if [ -n "$CUDA_ARCHIVE" ] || $CUDA_KEEP; then START_MODEL=winnow:e4b; fi
+    if { [ -n "$CUDA_ARCHIVE" ] || $CUDA_KEEP; } && [ -n "$GPU_MIB" ] && [ "$GPU_MIB" -ge 10240 ]; then
+        START_MODEL=winnow:e4b
+    fi
     if $SERVICE; then
         status "The Ollaya API is available at http://127.0.0.1:$PORT (systemd service: ollaya)"
     fi

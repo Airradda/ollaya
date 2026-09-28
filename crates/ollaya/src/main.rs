@@ -12,6 +12,7 @@ mod modelfile;
 mod render;
 mod run;
 
+use std::io::IsTerminal;
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
@@ -141,7 +142,12 @@ fn logging(default: &str, log_dir: Option<&std::path::Path>) -> Result<()> {
                 .with_context(|| format!("opening {}", path.display()))?;
             builder.with_ansi(false).with_writer(file).init();
         }
-        None => builder.with_writer(std::io::stderr).init(),
+        // No colour codes when stderr is a pipe: a runner's stderr is read by the daemon, and the
+        // daemon's by systemd's journal or a log file.
+        None => builder
+            .with_ansi(std::io::stderr().is_terminal())
+            .with_writer(std::io::stderr)
+            .init(),
     }
     Ok(())
 }

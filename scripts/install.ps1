@@ -36,7 +36,7 @@ function Test-Enabled([string]$value) { $value -and $value -notin '0', 'false', 
 # GPU pack the cards can run, cuda_v13 (CUDA 13, drivers from R580 on) or cuda_v12 (CUDA 12, from
 # R527 on, and pre-Turing cards on any driver).
 function Get-NvidiaGpu {
-    $gpu = [pscustomobject]@{ State = 'none'; Name = ''; Driver = ''; Cuda = ''; Pack = 'cuda_v13' }
+    $gpu = [pscustomobject]@{ State = 'none'; Name = ''; Driver = ''; Cuda = ''; Pack = 'cuda_v13'; MiB = 0 }
     $smi = Get-Command nvidia-smi.exe -ErrorAction SilentlyContinue |
         Select-Object -First 1 -ExpandProperty Source
     if (-not $smi -and (Test-Path "$env:SystemRoot\System32\nvidia-smi.exe")) {
@@ -52,6 +52,10 @@ function Get-NvidiaGpu {
             $gpu.Driver = $Matches[2]
             $header = (Invoke-Quiet $smi @()) -join "`n"
             if ($header -match 'CUDA[A-Z ]*Version:\s*([0-9][0-9.]*)') { $gpu.Cuda = $Matches[1] }
+            # The largest GPU's memory in MiB, for the model the summary suggests.
+            $mib = Invoke-Quiet $smi @('--query-gpu=memory.total', '--format=csv,noheader,nounits') |
+                ForEach-Object { if ($_ -match '^\s*([0-9]+)') { [int]$Matches[1] } } | Measure-Object -Maximum
+            if ($null -ne $mib.Maximum) { $gpu.MiB = [int]$mib.Maximum }
         }
     }
     if (-not $gpu.Driver) {
@@ -259,8 +263,9 @@ function Install-Ollaya {
     } elseif ($gpu.State -eq 'none') {
         Write-Host '>>> No NVIDIA GPU found; Ollaya will run on the CPU'
     }
-    # winnow:e4b (the recommended model) with the GPU pack; laya, which is fast on any CPU, otherwise.
-    Write-Host ">>> Get started:  ollaya run $(if ($downloadCuda -or $keepCuda) { 'winnow:e4b' } else { 'laya' })"
+    # winnow:e4b (the recommended model, 8 GB) with the GPU pack and a GPU that holds it; laya, which
+    # is fast on any CPU and on small GPUs, otherwise.
+    Write-Host ">>> Get started:  ollaya run $(if (($downloadCuda -or $keepCuda) -and $gpu.MiB -ge 10240) { 'winnow:e4b' } else { 'laya' })"
 }
 
 Install-Ollaya

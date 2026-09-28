@@ -197,7 +197,7 @@ sha256 (llama.cpp v0.5.0, build b11146):
 | | Requirement | Why |
 |---|---|---|
 | Linux | glibc 2.38 or newer: Ubuntu 24.04, Debian 13, Fedora 39, RHEL 10 or newer | pyke's `libonnxruntime.a` references `__isoc23_strtol` and related symbols (`GLIBC_2.38`) and `GLIBCXX_3.4.31`. The provider `.so` needs glibc 2.38 too. `install.sh` checks this. Older hosts can use the Docker image. |
-| Linux, GPU | NVIDIA driver R580 or newer (CUDA 13), or R525 or newer (CUDA 12), on x86-64 | The CUDA 13 pack runs Microsoft's ONNX Runtime 1.28.2 CUDA 13 build (Turing to Blackwell, sm_75 to sm_120; ADR 0004); minor-version compatibility covers the 13.4 runtime. From 0.7.3 a driver whose CUDA version is 12.x gets the CUDA 12 pack instead (Pascal to Blackwell; Blackwell needs R570). |
+| Linux, GPU | NVIDIA driver R580 or newer (CUDA 13), or R525 or newer (CUDA 12), on x86-64 | The CUDA 13 pack runs Microsoft's ONNX Runtime 1.28.2 CUDA 13 build (Turing to Blackwell, sm_75 to sm_120; ADR 0004); minor-version compatibility covers the 13.4 runtime. From 0.7.3 a driver whose CUDA version is 12.x gets the CUDA 12 pack instead (Pascal to Blackwell; Blackwell needs R570), and so do Pascal and Volta cards on any driver (compute capability below 7.5, read with `nvidia-smi --query-gpu=compute_cap`; the lowest card decides). |
 | WSL 2 | Windows NVIDIA driver with CUDA 13 or 12 | The driver's `libcuda.so.1` comes from `/usr/lib/wsl/lib`. Never install a Linux driver inside WSL. |
 | Windows | 10 or 11 on x64 | pyke's Windows build. `ollaya.exe` imports the Microsoft Visual C++ runtime (`VCRUNTIME140.dll`, `MSVCP140.dll`), as the CUDA provider does. |
 | Windows, GPU | NVIDIA driver R580 or newer (CUDA 13), or R527 or newer (CUDA 12) | Microsoft's ONNX Runtime 1.28.2 CUDA 13 or CUDA 12 build, as on Linux. `install.ps1` reads the driver from `nvidia-smi`, or from WMI. |
@@ -442,7 +442,7 @@ What it does:
    writes `/etc/systemd/system/ollaya.service`, enables it and restarts it. Then it waits up to 15 s
    for `GET /` to answer `Ollaya is running`. If any of those conditions is missing, it says why it
    skipped the service.
-8. **Prints next steps:** `ollaya run winnow:e4b` when it installed a GPU pack, `ollaya run laya` otherwise.
+8. **Prints next steps:** `ollaya run winnow:e4b` when it installed a GPU pack and the largest GPU has 10 GB or more, `ollaya run laya` otherwise.
 
 Models for the service live in `/usr/share/ollaya/.ollaya/models` (`OLLAYA_MODELS` in the unit). To
 change settings, run `sudo systemctl edit ollaya` and add `Environment=` lines.
@@ -490,7 +490,7 @@ $env:OLLAYA_NO_CUDA = '1'; irm https://ollaya.dev/install.ps1 | iex   # CPU only
   CUDA version, or, without a working `nvidia-smi`, the `Win32_VideoController` with NVIDIA's PCI
   vendor ID (`VEN_10DE`). Windows driver versions end in NVIDIA's: `32.0.16.1692` is 616.92. A
   driver with CUDA 13 (R580 or newer) gets the CUDA 13 pack, one with CUDA 12 (R527 or newer) the
-  CUDA 12 pack; an older driver, or a GPU without its driver (a "Microsoft Basic Display Adapter"),
+  CUDA 12 pack, and so does a Pascal or Volta card (compute capability below 7.5) on any driver; an older driver, or a GPU without its driver (a "Microsoft Basic Display Adapter"),
   gets a warning and the CPU. It never installs drivers.
 - **Upgrades:** as on Linux, an installed pack whose libraries match the release's
   `ollaya-windows-amd64-cuda.sha256` is kept, together with its notices, and the runner copies of
@@ -602,7 +602,8 @@ A prerelease tag (one with `-`) only gets the versioned tags.
   `NVIDIA_DRIVER_CAPABILITIES=compute,utility`, as Ollama's image does.
 
 The host needs the NVIDIA Container Toolkit and a CUDA 13 driver for `:cuda`, or a CUDA 12 driver
-for `:cuda12`.
+for `:cuda12`. Pascal and Volta GPUs (GTX 10-series, Titan V, V100) need `:cuda12` on any driver:
+the CUDA 13 build's kernels start at Turing.
 
 **User and volume.**
 - **User.** The image runs as `ollaya`, uid and gid 1000 (build argument `OLLAYA_UID`), numeric so
