@@ -25,7 +25,7 @@ Ollaya is a single binary: the CLI, the server and the model runners. If you hav
 | `ollaya create NAME [-f Modelfile]` | Create a model from a [Modelfile](/docs/modelfile) |
 | `ollaya -v` | Print the server's (and the client's) version |
 
-Every command except `serve` talks to the server at `OLLAYA_HOST`. When nothing answers there and the address is local, the CLI (except `ollaya stop` without a model) starts `ollaya serve` in the background, logging to `~/.ollaya/logs/server.log`.
+Every command except `serve` talks to the server at `OLLAYA_HOST`. When nothing answers there and the address is local, the CLI (except `ollaya stop` without a model) starts `ollaya serve` in the background, logging to `~/.ollaya/logs/server.log` (or `server.log` in `OLLAYA_LOG_DIR`).
 
 ## Model names
 
@@ -99,6 +99,8 @@ It is configured with environment variables:
 | `OLLAYA_API_KEY` | unset | Require `Authorization: Bearer <key>`; the CLI sends it too |
 | `OLLAYA_ORIGINS` | unset | Extra browser origins to allow, comma-separated |
 | `OLLAYA_REGISTRY` | `{{SITE_HOST}}` | Default registry host in model names |
+| `OLLAYA_LOG` | `info` | Log levels; `debug` logs every request with its status and duration |
+| `OLLAYA_LOG_DIR` | unset | Log to `<dir>/server.log` instead of stderr (created if missing; appended, never rotated) |
 
 For the systemd service, change them with `sudo systemctl edit ollaya` and `Environment=` lines.
 

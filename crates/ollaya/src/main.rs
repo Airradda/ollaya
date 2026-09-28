@@ -14,7 +14,7 @@ mod run;
 
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use ollaya_server::config::VERSION;
 
@@ -124,14 +124,26 @@ enum Command {
     },
 }
 
-fn logging(default: &str) {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_env("OLLAYA_LOG")
-                .unwrap_or_else(|_| default.into()),
-        )
-        .with_writer(std::io::stderr)
-        .init();
+/// Logs at the levels in `OLLAYA_LOG` (else `default`) to stderr, or to `<log_dir>/server.log`.
+fn logging(default: &str, log_dir: Option<&std::path::Path>) -> Result<()> {
+    let builder = tracing_subscriber::fmt().with_env_filter(
+        tracing_subscriber::EnvFilter::try_from_env("OLLAYA_LOG")
+            .unwrap_or_else(|_| default.into()),
+    );
+    match log_dir {
+        Some(dir) => {
+            std::fs::create_dir_all(dir).with_context(|| format!("creating {}", dir.display()))?;
+            let path = dir.join("server.log");
+            let file = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&path)
+                .with_context(|| format!("opening {}", path.display()))?;
+            builder.with_ansi(false).with_writer(file).init();
+        }
+        None => builder.with_writer(std::io::stderr).init(),
+    }
+    Ok(())
 }
 
 /// `ollaya -v`: the server's version, and the client's when they differ (as Ollama prints it).
@@ -179,7 +191,7 @@ fn main() -> Result<()> {
             device,
             threads,
         } => {
-            logging("info,ort=warn");
+            logging("info,ort=warn", None)?;
             rt.block_on(ollaya_runner::server::run(
                 ollaya_runner::server::RunnerConfig {
                     graph_fp32,
@@ -196,7 +208,7 @@ fn main() -> Result<()> {
             ))?;
         }
         Command::LlamaDevices => {
-            logging("warn");
+            logging("warn", None)?;
             // Found the way the daemon finds them: the libraries next to this executable (or in
             // $OLLAYA_LIBRARY_PATH), the CUDA backend in the CUDA pack.
             let exe = std::env::current_exe()?;
@@ -213,13 +225,13 @@ fn main() -> Result<()> {
             println!("{}", serde_json::to_string_pretty(&found)?);
         }
         Command::Serve => {
-            logging("info");
             let config = ollaya_server::config::ServerConfig::from_env()?;
+            logging("info", config.log_dir.as_deref())?;
             rt.block_on(daemon::serve(config))?;
         }
         Command::Mcp { http } => {
             // stdout is the MCP channel over stdio: logs go to stderr, and only warnings.
-            logging("warn");
+            logging("warn", None)?;
             match http {
                 Some(addr) => rt.block_on(mcp::serve_http(&addr))?,
                 None => rt.block_on(mcp::serve_stdio())?,
