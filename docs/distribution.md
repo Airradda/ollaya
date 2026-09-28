@@ -142,6 +142,7 @@ stay on those). The installers pick it when the driver's CUDA version is 12.x; t
 | `cufft64_12.dll` | `nvidia-cufft==12.4.0.43` |
 | `nvrtc64_130_0.dll`, `nvrtc-builtins64_134.dll` | `nvidia-cuda-nvrtc==13.4.92` |
 | `nvJitLink_130_0.dll` | `nvidia-nvjitlink==13.4.92` |
+| `ggml-cuda.dll` | llama.cpp's CUDA backend for GGUF models, from `llama-b11146-bin-win-cuda-13.4-x64.zip` (0.7.4 and later). It imports `cublas64_13.dll` from the pack and links the CUDA runtime statically |
 
 - **Taken from** the `nvidia/*/bin/` folders of the `win_amd64` wheels, byte for byte. `nvblas64_13.dll`
   and `cufftw64_12.dll` are left out, as on Linux, and so are the TensorRT providers
@@ -173,6 +174,7 @@ sha256 (llama.cpp v0.5.0, build b11146):
 | `lib/ollaya/llama/` (linux-amd64) | `libllama.so.0`, `libggml.so.0`, `libggml-base.so.0` and 14 `libggml-cpu-*.so` variants | `llama-b11146-bin-ubuntu-cuda-13.4-x64.tar.gz` |
 | `lib/ollaya/cuda_v13/libggml-cuda.so` | the CUDA backend | the same archive, so CPU and CUDA are one build |
 | `lib/ollaya/cuda_v12/libggml-cuda.so` | the CUDA backend for CUDA 12 drivers | `llama-b11146-bin-ubuntu-cuda-12.8-x64.tar.gz`, the same build (commit and ggml backend interface) |
+| `lib/ollaya/cuda_v13/ggml-cuda.dll` (windows-amd64) | the CUDA backend | `llama-b11146-bin-win-cuda-13.4-x64.zip`. The Windows CUDA 12 pack has none: ggml-org's CUDA 12.4 build would take that zip past GitHub's 2 GiB limit per release asset |
 | `lib/ollaya/llama/` (linux-arm64) | the same set, arm64 CPU variants | `llama-b11146-bin-ubuntu-arm64.tar.gz` |
 | `lib/ollaya/llama/` (darwin-arm64) | `libllama.0.dylib`, `libggml*.0.dylib` (Metal built in, shaders embedded, macOS 13.3 or newer) | `llama-b11146-bin-macos-arm64.tar.gz` |
 | `lib/ollaya/llama/` (windows-amd64) | `llama.dll`, `ggml.dll`, `ggml-base.dll`, the `ggml-cpu-*.dll` variants and `libomp.dll` | `llama-b11146-bin-win-cpu-x64.zip` |
