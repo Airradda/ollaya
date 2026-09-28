@@ -1717,7 +1717,7 @@ dependencies = [
 
 [[package]]
 name = "ollaya"
-version = "0.7.4"
+version = "0.7.5"
 dependencies = [
  "anyhow",
  "axum",
@@ -1745,7 +1745,7 @@ dependencies = [
 
 [[package]]
 name = "ollaya-api"
-version = "0.7.4"
+version = "0.7.5"
 dependencies = [
  "chrono",
  "futures-util",
@@ -1760,7 +1760,7 @@ dependencies = [
 
 [[package]]
 name = "ollaya-decision"
-version = "0.7.4"
+version = "0.7.5"
 dependencies = [
  "indexmap",
  "serde",
@@ -1770,7 +1770,7 @@ dependencies = [
 
 [[package]]
 name = "ollaya-lang"
-version = "0.7.4"
+version = "0.7.5"
 dependencies = [
  "serde",
  "serde_json",
@@ -1778,7 +1778,7 @@ dependencies = [
 
 [[package]]
 name = "ollaya-mlx"
-version = "0.7.4"
+version = "0.7.5"
 dependencies = [
  "ollaya-mlx-sys",
  "thiserror",
@@ -1786,7 +1786,7 @@ dependencies = [
 
 [[package]]
 name = "ollaya-mlx-sys"
-version = "0.7.4"
+version = "0.7.5"
 dependencies = [
  "bindgen",
  "sha2",
@@ -1794,7 +1794,7 @@ dependencies = [
 
 [[package]]
 name = "ollaya-registry"
-version = "0.7.4"
+version = "0.7.5"
 dependencies = [
  "axum",
  "chrono",
@@ -1814,7 +1814,7 @@ dependencies = [
 
 [[package]]
 name = "ollaya-runner"
-version = "0.7.4"
+version = "0.7.5"
 dependencies = [
  "anyhow",
  "axum",
@@ -1835,7 +1835,7 @@ dependencies = [
 
 [[package]]
 name = "ollaya-server"
-version = "0.7.4"
+version = "0.7.5"
 dependencies = [
  "axum",
  "chrono",
