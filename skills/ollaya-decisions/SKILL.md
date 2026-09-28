@@ -61,6 +61,7 @@ If none is available, tell the user how to install Ollaya:
 | `laya` (default when `model` is omitted) | English and 100+ languages, routed automatically; calibrated; the fastest | ~10 ms GPU, ~0.2–0.4 s CPU |
 | `kev` | Qwen3.5 decoder with a pointer head, 0.8b to 9b (`kev:9b` 0.722); calibrated | `kev:4b` ~0.35 s GPU |
 | `decider` | Qwen3.5 decoders, 0.8b to 4b (`decider:4b` 0.680) | ~0.2–0.5 s GPU, ~1 s CPU |
+| `clm` | Contrastive: embeds the state and each option (Qwen3-8B); questions and options are cached; for agent, game and tool-calling states | ~0.15 s GPU with cached questions |
 | `nli` | Zero-shot, good at yes/no with clear statements | ~20 ms GPU |
 | `gliclass` | Zero-shot, many options in one pass | ~15 ms GPU |
 | `decision` | Decision 1.0 Eos: fully fine-tuned Qwen3.5-0.8B with an endpoint head; rows up to 16k tokens; calibrated | ~0.2 s GPU, ~0.85 s CPU |
