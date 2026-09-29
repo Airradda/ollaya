@@ -581,8 +581,10 @@ impl Scheduler {
             loaded_at: SystemTime::now(),
             port: hello.port,
             child: tokio::sync::Mutex::new(child),
+            // Plain HTTP to 127.0.0.1: no TLS roots, so a host without CA certificates works.
             http: reqwest::Client::builder()
                 .no_proxy()
+                .tls_certs_only(std::iter::empty())
                 .build()
                 .map_err(|e| Error::LoadFailed(e.to_string()))?,
             leases: AtomicUsize::new(0),

@@ -90,6 +90,10 @@ impl Client {
             // A system proxy must never see traffic to the local daemon.
             builder = builder.no_proxy();
         }
+        if host.scheme == "http" {
+            // No TLS, so no system CA certificates needed (minimal containers have none).
+            builder = builder.tls_certs_only(std::iter::empty());
+        }
         let http = builder.build().map_err(|source| ClientError::Http {
             url: host.base_url(),
             source,
