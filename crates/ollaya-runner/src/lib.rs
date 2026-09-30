@@ -14,6 +14,7 @@ pub mod llama;
 #[cfg(feature = "mlx")]
 pub mod mlx;
 pub mod net;
+pub mod nimble;
 pub mod nli;
 pub mod onnx;
 pub mod qwen3guard;

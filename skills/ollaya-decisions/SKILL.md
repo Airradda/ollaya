@@ -68,6 +68,9 @@ If none is available, tell the user how to install Ollaya:
 | `decision` | Decision 1.0 Eos: fully fine-tuned Qwen3.5-0.8B with an endpoint head; rows up to 16k tokens; calibrated | ~0.2 s GPU, ~0.85 s CPU |
 | `qwen3guard` | Safety guard; answers only its built-in questions (send no `questions`) | ~40 ms GPU, ~2 s CPU |
 | `von` | ModernBERT-large, every option scored at its own marker; states up to 8k tokens; calibrated | ~25 ms GPU, ~0.8 s CPU |
+| `nimble` | Bespoke Labs' Nimble (LoRA on Qwen3.5-9B): reads the whole request as a schema; calibrated; up to 255 options; needs a 24 GB GPU | ~2.3 s GPU |
+| `jeb` | Jebadiah (Qwen3.5 4b/9b, Qwen3.8 27b) on llama.cpp; per-type calibration | `jeb:9b` ~0.12 s GPU |
+| `cygnet` | Frozen Gemma 4 12B IT with Cygnet's letter prompt; 0.683 on typed decisions; calibrated; up to 20 options | ~0.2 s GPU |
 
 With an NVIDIA GPU, start with `winnow:e4b`. Without one, start with `laya`, and move to a larger
 model when `laya`'s confidence is often low on your data.
