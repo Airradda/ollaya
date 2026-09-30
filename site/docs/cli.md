@@ -1,7 +1,7 @@
 ---
 title: CLI reference
 nav: CLI
-description: Every ollaya command and flag: run, pull, serve, list, ps, show, stop, rm, cp, create and mcp.
+description: Every ollaya command and flag: run, pull, serve, list, ps, show, stop, rm, cp, create, preset, update and mcp.
 order: 2
 ---
 
@@ -23,9 +23,10 @@ Ollaya is a single binary: the CLI, the server and the model runners. If you hav
 | `ollaya rm MODEL…` | Remove one or more models |
 | `ollaya cp SOURCE DESTINATION` | Copy a model under a new name |
 | `ollaya create NAME [-f Modelfile]` | Create a model from a [Modelfile](/docs/modelfile) |
+| `ollaya update [--check]` | Install the latest release over this one |
 | `ollaya -v` | Print the server's (and the client's) version |
 
-Every command except `serve` talks to the server at `OLLAYA_HOST`. When nothing answers there and the address is local, the CLI (except `ollaya stop` without a model) starts `ollaya serve` in the background, logging to `~/.ollaya/logs/server.log` (or `server.log` in `OLLAYA_LOG_DIR`).
+Every command except `serve` and `update` talks to the server at `OLLAYA_HOST`. When nothing answers there and the address is local, the CLI (except `ollaya stop` without a model) starts `ollaya serve` in the background, logging to `~/.ollaya/logs/server.log` (or `server.log` in `OLLAYA_LOG_DIR`).
 
 ## Model names
 
@@ -175,6 +176,17 @@ ollaya run winnow:e4b --preset billing-check "I was charged twice this month."
 | `ollaya preset rm NAME...` | Delete custom presets. Built-in presets cannot be deleted |
 
 Names are lowercase letters, digits, `-` and `_`. Custom presets are stored by the server (in `presets/` next to the models), so the CLI, the API and the MCP server all see them. A preset differs from a model made with a Modelfile's `QUESTIONS`: it isn't bound to one model, and it copies nothing.
+
+## ollaya update
+
+Installs the latest release over this one: it runs the install script again into the same prefix, so models, presets and the systemd service stay as they are.
+
+```shell
+ollaya update --check   # only say whether a newer release exists
+ollaya update
+```
+
+A binary that came with the desktop app (the macOS app, the Windows installer, an AppImage, or the .deb and .rpm packages) is updated by installing the new app, and a container by pulling the new image; `ollaya update` says so instead of changing it.
 
 ## ollaya create
 

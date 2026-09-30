@@ -82,6 +82,10 @@ With temperature scaling per question type and number of options, shipped with e
 
 Both. `ollaya mcp` serves the local models to Claude Code, Claude Desktop, Cursor and other MCP clients (`claude mcp add ollaya -- ollaya mcp`), and the `ollaya-decisions` skill teaches agents when and how to use them. See [Agents](/docs/agents).
 
+## How do I update it?
+
+Run `ollaya update`. It checks the latest release and, when there is a newer one, runs the install script again into the same place, which keeps your models and the service settings. `ollaya update --check` only tells you whether an update exists. The desktop app updates as a whole: install the new version from [Download](/download). In Docker, pull the new image.
+
 ## How do I uninstall it?
 
 On Linux, after the installer set up the service:

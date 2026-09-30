@@ -11,6 +11,7 @@ use ollaya_api::presets;
 mod modelfile;
 mod render;
 mod run;
+mod update;
 
 use std::io::IsTerminal;
 use std::path::PathBuf;
@@ -86,6 +87,12 @@ enum Command {
     /// Manage presets: named question sets for `run --preset` and `/api/decide`
     #[command(subcommand)]
     Preset(PresetCommand),
+    /// Update ollaya to the latest release
+    Update {
+        /// Only say whether a newer release exists
+        #[arg(long)]
+        check: bool,
+    },
     /// Create a model from a Modelfile
     Create {
         name: String,
@@ -254,6 +261,8 @@ fn main() -> Result<()> {
         // Without a model, `stop` must not start a server just to stop it.
         Command::Stop { model: None } => rt.block_on(daemon::stop_server())?,
         Command::Run(args) => run::run(&rt, args)?,
+        // Updating needs no server.
+        Command::Update { check } => rt.block_on(update::update(check))?,
         command => rt.block_on(client_command(command))?,
     }
     Ok(())
@@ -302,6 +311,7 @@ async fn client_command(command: Command) -> Result<()> {
         | Command::Runner { .. }
         | Command::LlamaDevices
         | Command::Mcp { .. }
+        | Command::Update { .. }
         | Command::Stop { model: None } => {
             unreachable!("handled in main")
         }

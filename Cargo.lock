@@ -1732,6 +1732,7 @@ dependencies = [
  "ollaya-decision",
  "ollaya-runner",
  "ollaya-server",
+ "reqwest",
  "rmcp",
  "rustyline",
  "schemars",
