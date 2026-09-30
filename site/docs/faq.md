@@ -18,6 +18,24 @@ The [desktop app](/download) for macOS, Windows and Linux; `curl -fsSL {{SITE_OR
 
 Ollaya borrows Ollama's experience (one binary, `pull`, `run`, `serve`, Modelfiles, a local REST API with the same conventions) and applies it to decision models instead of generative language models. It is an independent project, not affiliated with Ollama.
 
+## Ollama runs decision models now. How is Ollaya different?
+
+Ollama 0.35 (September 2026) added `/v1/systemone` for two decoder models, Bespoke Labs' Nimble and Together AI's Tev1. Both projects follow TypeSafe's wire format, and for decoder models both read the answer labels' next-token scores. Ollaya runs Nimble too, since 0.8.0. This comparison is with Ollama 0.35:
+
+| | Ollaya | Ollama 0.35 |
+|---|---|---|
+| Models | 15 families: encoders (`laya`, `nli`, `gliclass`, `von`) and decoders (`winnow`, `kev`, `decider`, `nimble`, `jeb`, `jeeves`, `cygnet` and more) | Nimble (9B) and Tev1 (4B, 0.8B) |
+| Encoders | Read every question in one forward pass. `laya:en` answers five questions in 8 to 10 ms on an RTX 4090 | Not supported |
+| Probabilities | Calibrated with each model's fitted temperatures, which you can refit on your own data in a [Modelfile](/docs/modelfile#calibration) | Softmax of the raw label scores. Ollama documents `confidence` as uncalibrated |
+| Limits | TypeSafe's: 1 to 256 questions, 2 to 255 options, 2 to 10 score levels | 1 to 64 questions, 2 to 26 options and score levels, a 64 KiB request body |
+| API | TypeSafe's `/v1/systemone`, `/v1/decisions` and `/v1/models`; `/api/decide` with routing and timings; an MCP server | `/v1/systemone` |
+| Routers | `laya` picks the English or the multilingual model for each request | None |
+| Weights | Pulled unmodified from the author's Hugging Face repository, pinned to a commit and checked by sha256 | Converted to GGUF and served from Ollama's registry |
+
+**Measured side by side.** On one RTX 5090, over Bespoke Labs' public benchmark (3,880 human-labeled questions from 13 datasets, scored with Bespoke's own code): `winnow:12b` on Ollaya scores 0.773 at 60 ms per question, against 0.749 at 210 ms for Nimble on Ollama, Ollama's best. On the same Nimble weights the accuracy is the same (0.748 and 0.749), the calibration error is 5.5 times lower on Ollaya (0.022 against 0.122, because Ollaya applies the author's temperature), and Ollama is faster (210 against 310 ms: it runs a Q8_0 GGUF where Ollaya computes in fp32). The [home page](/#vs-ollama) has the chart.
+
+Ollama's advantages are real too. Tev1 is there and not here yet (Together AI has not published a license for its weights), and if you already use Ollama for language models, one daemon covers both. The two run side by side: Ollama on port 11434, Ollaya on 11435.
+
 ## How is it related to TypeSafe?
 
 TypeSafe's closed Jev model created the decision-model category. Ollaya serves open models behind a TypeSafe-compatible API: the official TypeSafe Python SDK 0.7.1 works unchanged with `TYPESAFE_BASE_URL=http://localhost:11435` and any API key. Ollaya is not affiliated with TypeSafe. See [TypeSafe compatibility](/docs/typesafe-compatibility).
