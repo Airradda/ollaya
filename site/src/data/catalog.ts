@@ -208,6 +208,20 @@ const overlays: Record<string, ModelOverlay> = {
       '9b': { summary: "Bespoke-Nimble-9B v2 (LoRA on Qwen3.5-9B) with the author's temperature 2.18. Needs a 24 GB GPU." },
     },
   },
+  jeeves: {
+    stats: { tag: 'jeeves:9b', accuracy: 0.68, latencyMs: 838 },
+    title: 'Jeeves',
+    description:
+      "Decision model by PostHog: Qwen3.5-9B with a LoRA merged in and a pointer head that scores every option at its own marker. Ollaya runs it without its reasoning chain, in one forward pass per question, calibrated with the authors' temperature.",
+    publisher: { name: 'PostHog', url: 'https://huggingface.co/PostHog' },
+    capabilities: ['decision', 'fine-tuned'],
+    keywords: ['jeeves', 'posthog', 'qwen', 'qwen3.5', 'pointer', 'llm', 'decision', 'classification', 'typesafe', 'jev', 'system one'],
+    rank: 15,
+    tags: {
+      latest: { summary: 'Same as jeeves:9b.' },
+      '9b': { summary: 'Jeeves-9B without thinking, with the fitted temperature 1.86. Needs a 24 GB GPU.' },
+    },
+  },
   jeb: {
     stats: { tag: 'jeb:9b', latencyMs: 124 },
     title: 'Jebadiah',

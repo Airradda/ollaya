@@ -96,6 +96,7 @@ pub const LAYOUTS: &[&str] = &[
     "clm-v1",
     "decider-vision-v1",
     "nimble-codes-v1",
+    "jeeves-markers-v1",
 ];
 
 /// The layout a `decision` layer declares.
@@ -146,6 +147,9 @@ pub fn load(
             crate::decider_vision::VisionDeciderModel::load_files(files, device, threads)?,
         )),
         "nimble-codes-v1" => Ok(Box::new(crate::nimble::NimbleModel::load_files(
+            files, device, threads,
+        )?)),
+        "jeeves-markers-v1" => Ok(Box::new(crate::jeeves::JeevesModel::load_files(
             files, device, threads,
         )?)),
         other => Err(Error::Model(format!(

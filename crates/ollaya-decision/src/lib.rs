@@ -13,6 +13,7 @@ pub mod decider;
 pub mod decision;
 pub mod gliclass;
 pub mod jebadiah;
+pub mod jeeves;
 pub mod jevk5;
 pub mod kev;
 pub mod layout;

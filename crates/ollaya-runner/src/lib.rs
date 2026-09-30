@@ -9,6 +9,7 @@ pub mod decider_vision;
 pub mod decision;
 pub mod engine;
 pub mod gliclass;
+pub mod jeeves;
 pub mod kev;
 pub mod llama;
 #[cfg(feature = "mlx")]

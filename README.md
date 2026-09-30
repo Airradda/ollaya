@@ -98,6 +98,7 @@ numbers: [ollaya.dev/search](https://ollaya.dev/search).
 | `jevk5` | alibiserikbay's JevK5 v0.3, a Qwen3.5-4B fine-tune run from the author's Q8_0 GGUF on llama.cpp, up to 16 options |
 | `nimble` | Bespoke Labs' Nimble v2: a LoRA on Qwen3.5-9B that reads the whole request as a JSON schema and scores option codes, with the author's temperature: 0.665 on typed-decisions, up to 255 options, ~2.3 s for five questions on an RTX 4090 |
 | `jeb`, `jeb:4b`, `jeb:27b` | Jason Brashear's Jebadiah (AINode): LoRAs merged into Qwen3.5 (9B by default, 4B) and Qwen3.8-27B, run from the authors' GGUF on llama.cpp with their per-type temperatures; `jeb:9b` answers five questions in 124 ms on an RTX 4090 |
+| `jeeves` | PostHog's Jeeves-9B without its reasoning chain: Qwen3.5-9B (LoRA merged) and a pointer head: 0.680 on typed-decisions with an ECE of 0.031, 838 ms for five questions on an RTX 4090 |
 | `cygnet` | blockbrain-ai's Cygnet: frozen Gemma 4 12B IT (Q8_0 GGUF) with a letter-readout prompt and temperature 3.4: 0.683 on typed-decisions, 202 ms for five questions on an RTX 4090 |
 
 Browse them at [ollaya.dev/search](https://ollaya.dev/search). Laya tags ending in
@@ -158,7 +159,7 @@ Apache-2.0. Each model keeps its own license: `laya` (Convai Innovations), `deci
 `kev` (Jared Palmer, on Qwen3.5 by the Qwen team), `decision` (the vLLM Semantic Router
 contributors, on Qwen3.5), `qwen3guard` (Qwen team), `gliclass` (Knowledgator), `von` (Victor Hugo
 Panisa), `winnow` (EldanRing, on Gemma 4 by Google DeepMind), `jevk5` (alibiserikbay, on Qwen3.5), `nimble`
-(Bespoke Labs, on Qwen3.5), `jeb` (Jason Brashear, on Qwen3.5 and Qwen3.8), `cygnet` (Gemma 4 by Google
+(Bespoke Labs, on Qwen3.5), `jeeves` (PostHog, on Qwen3.5), `jeb` (Jason Brashear, on Qwen3.5 and Qwen3.8), `cygnet` (Gemma 4 by Google
 DeepMind; the Cygnet recipe is MIT) and `nli:modernbert-large` are Apache-2.0, and `nli:deberta-v3-large` (Moritz Laurer) is MIT. llama.cpp, which Ollaya ships for
 GGUF models, is MIT.
 
