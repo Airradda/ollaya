@@ -16,6 +16,7 @@
 //! the same one. A model whose cache cannot be cut back to a prefix (Qwen3.5's recurrent layers,
 //! `jevk5-v1`) uses the `cold` plan: every question is one cold pass.
 
+pub mod cuda_kernels;
 pub mod ffi;
 
 use std::ffi::{CString, c_char, c_int, c_void};
@@ -273,13 +274,36 @@ pub fn probe(libs: &Libraries) -> Result<Value, Error> {
                     0 => "cpu",
                     _ => "accel",
                 };
-                serde_json::json!({
-                    "name": ffi::cstr((api.ggml_backend_dev_name)(d)),
+                let name = ffi::cstr((api.ggml_backend_dev_name)(d));
+                let cuda = name
+                    .strip_prefix("CUDA")
+                    .and_then(|n| n.parse().ok())
+                    .and_then(cuda_kernels::device_info);
+                let mut extra = serde_json::Map::new();
+                if let Some(info) = cuda {
+                    let (ma, mi) = info.compute_capability;
+                    extra.insert("compute_capability".into(), format!("{ma}.{mi}").into());
+                    extra.insert(
+                        "driver_cuda".into(),
+                        format!("{}.{}", info.driver / 1000, (info.driver % 1000) / 10).into(),
+                    );
+                    extra.insert(
+                        "kernels".into(),
+                        match cuda_unsupported(libs, &name) {
+                            Some(why) => why.into(),
+                            None => "ok".into(),
+                        },
+                    );
+                }
+                let mut v = serde_json::json!({
+                    "name": name,
                     "description": ffi::cstr((api.ggml_backend_dev_description)(d)),
                     "type": kind,
                     "memory_free_mib": free >> 20,
                     "memory_total_mib": total >> 20,
-                })
+                });
+                v.as_object_mut().expect("an object").extend(extra);
+                v
             })
             .collect();
         (version, devices)
@@ -315,6 +339,15 @@ fn gpus(api: &Api) -> Vec<Gpu> {
             })
             .collect()
     }
+}
+
+/// Why llama.cpp's CUDA backend cannot run on the device named `dev` (`CUDA0`), or `None` when it
+/// can or it cannot be told (not a CUDA device, an unknown pack, no answer from the driver).
+fn cuda_unsupported(libs: &Libraries, dev: &str) -> Option<String> {
+    let ordinal = dev.strip_prefix("CUDA")?.parse().ok()?;
+    let kernels = cuda_kernels::for_backend(libs.cuda.as_deref()?)?;
+    let info = cuda_kernels::device_info(ordinal)?;
+    kernels.check(info.compute_capability, info.driver).err()
 }
 
 /// Ollaya's name for a llama.cpp device: `CUDA0` → `cuda:0`, `MTL0` → `metal`.
@@ -546,6 +579,26 @@ impl LlamaModel {
             }
         };
         let threads = threads.map_or_else(default_threads, |t| t as i32);
+        // A CUDA GPU the pack's kernels cannot run on would load, then abort at the first
+        // question (#42): skip it with the reason instead.
+        let pick = match pick.map(|gpu| (gpu, cuda_unsupported(libs, &gpu.name))) {
+            Some((gpu, Some(why))) if *target == Target::Auto => {
+                tracing::warn!(
+                    "{} ({}): {why}; loading on the CPU instead",
+                    gpu.name,
+                    gpu.description
+                );
+                None
+            }
+            Some((gpu, Some(why))) => {
+                return Err(model_error(format!(
+                    "{} ({}): {why}",
+                    gpu.name, gpu.description
+                )));
+            }
+            Some((gpu, None)) => Some(gpu),
+            None => None,
+        };
         let (handles, device) = match pick {
             Some(gpu) => {
                 tracing::info!(device = %gpu.name, description = %gpu.description,
