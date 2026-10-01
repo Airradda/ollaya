@@ -312,7 +312,7 @@ function Speed() {
 }
 
 function WindowsGpus() {
-  const run = parityRuns.find((r) => r.machine === 'choso' && r.results.some((x) => x.device === 'vulkan'))
+  const run = parityRuns.find((r) => r.results.some((x) => x.device === 'vulkan'))
   if (!run) return null
   const models = [...new Set(run.results.filter((x) => x.device === 'vulkan').map((x) => x.model))]
   const rows = models.flatMap((m) =>
@@ -446,11 +446,9 @@ function Machines() {
   return (
     <Section id="machines" title="Machines and data" lead="Where the numbers come from.">
       <div class="grid gap-4 md:grid-cols-2">
-        {Object.entries(machines).map(([id, m]) => (
+        {Object.values(machines).map((m) => (
           <div class="rounded-xl border border-line p-5">
-            <p class="text-sm font-medium text-fg">
-              {m.label} <span class="font-mono text-xs font-normal text-muted">{id}</span>
-            </p>
+            <p class="text-sm font-medium text-fg">{m.label}</p>
             <dl class="mt-3 grid grid-cols-[4.5rem_minmax(0,1fr)] gap-x-3 gap-y-1 text-[13px]">
               <dt class="text-muted">CPU</dt>
               <dd class="text-body">{m.cpu}</dd>

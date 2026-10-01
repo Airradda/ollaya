@@ -123,9 +123,9 @@
    "precision": "F32"
   }
  ],
- "machine": "choso",
+ "machine": "rtx-4090",
  "machine_detail": {
-  "id": "choso",
+  "id": "rtx-4090",
   "cpu": "13th Gen Intel(R) Core(TM) i9-13900K",
   "threads": 24,
   "gpus": [

@@ -3,7 +3,7 @@
  "suite": "latency-triage",
  "date": "2026-10-01T11:18:36Z",
  "ollaya": "0.8.0",
- "machine": "choso",
+ "machine": "rtx-4090",
  "device": "cuda",
  "protocol": {
   "preset": "triage",
@@ -255,7 +255,7 @@
   }
  ],
  "machine_detail": {
-  "id": "choso",
+  "id": "rtx-4090",
   "cpu": "13th Gen Intel(R) Core(TM) i9-13900K",
   "threads": 24,
   "gpus": [

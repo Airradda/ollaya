@@ -1,8 +1,8 @@
 """Time every model on one Ollaya server the way a client sees it: the triage preset (five questions)
 on one short message through `/api/decide`, one request at a time, HTTP included.
 
-    python -m ollaya_convert.bench_latency --url http://127.0.0.1:11435 --machine hope --device cuda \
-        --out ../results/runs/2026-10-01-latency-hope-cuda.json [--models winnow:e4b kev:4b] [--warm 5 --n 20]
+    python -m ollaya_convert.bench_latency --url http://127.0.0.1:11435 --machine rtx-5090 --device cuda \
+        --out ../results/runs/2026-10-01-latency-rtx5090-cuda.json [--models winnow:e4b kev:4b] [--warm 5 --n 20]
 
 Without `--models` it times every model the server has (routers left out: they answer with the
 model they route to). Each model: one load, `--warm` untimed requests, then `--n` timed ones; the

@@ -2,7 +2,7 @@
  "schema": 1,
  "suite": "public-benchmark",
  "date": "2026-09-30",
- "machine": "hope",
+ "machine": "rtx-5090",
  "device": "cuda",
  "servers": {
   "ollaya": "0.8.0 (pre-release build of the runtime that shipped as 0.8.0)",

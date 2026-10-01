@@ -365,9 +365,9 @@
    "precision": "Q8_0"
   }
  ],
- "machine": "hope",
+ "machine": "rtx-5090",
  "machine_detail": {
-  "id": "hope",
+  "id": "rtx-5090",
   "cpu": "AMD Ryzen Threadripper 3960X 24-Core Processor",
   "threads": 48,
   "gpus": [

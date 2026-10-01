@@ -350,7 +350,7 @@ function Fast() {
 // and scored with Bespoke's own runner (convert/ollaya_convert/bench_public.py). Both servers ran on the same
 // RTX 4090, one request at a time through /v1/systemone. Accuracy: macro average over the 13 subsets. ECE:
 // ten-bin expected calibration error of the top probability, averaged over the subsets (lower is better).
-// Latency: median request, HTTP included. Numbers: ~/agents/bench/report.md on choso-wsl (2026-09-30).
+// Latency: median request, HTTP included. Numbers: results/runs/2026-09-30-public-benchmark-rtx5090-cuda.json.
 type VsRun = { tag: string; server: 'ollaya' | 'ollama'; acc: number; ece: number; ms: number }
 const vsRuns: VsRun[] = [
   { tag: 'winnow:12b', server: 'ollaya', acc: 0.773, ece: 0.141, ms: 60 },
