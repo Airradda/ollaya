@@ -83,7 +83,7 @@ export function DownloadPage({ origin }: { origin: string }) {
       <p class="mt-4 text-center text-lg text-body">A desktop app and a command line for macOS, Windows and Linux, or a Docker image.</p>
 
       <div class="mt-10">
-        <div role="tablist" aria-label="Platform" data-os-tabs class="mx-auto flex w-fit gap-1 rounded-full border border-line p-1">
+        <div role="tablist" aria-label="Platform" data-os-tabs class="mx-auto flex w-full max-w-md gap-1 rounded-full border border-line p-1 sm:w-fit">
           {tabs.map((t) => {
             const on = t.id === selected
             return (
@@ -94,7 +94,7 @@ export function DownloadPage({ origin }: { origin: string }) {
                 aria-controls={`os-panel-${t.id}`}
                 aria-selected={on ? 'true' : 'false'}
                 tabindex={on ? 0 : -1}
-                class="rounded-full px-5 py-1.5 text-sm font-medium text-muted hover:text-fg aria-selected:bg-btn aria-selected:text-btn-fg"
+                class="flex-1 rounded-full px-2 py-1.5 text-sm font-medium text-muted hover:text-fg aria-selected:bg-btn aria-selected:text-btn-fg sm:flex-none sm:px-5"
               >
                 {t.label}
               </button>

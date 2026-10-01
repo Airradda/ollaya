@@ -172,6 +172,7 @@ export function Scatter({
   label,
   legend,
   standalone,
+  compact,
 }: {
   points: ScatterPoint[]
   xTicks: number[]
@@ -182,15 +183,18 @@ export function Scatter({
   legend?: SeriesKey[]
   /** Render as its own .svg file, with its colours and the legend inside. */
   standalone?: boolean
+  /** The phone layout: a narrower canvas, so the text keeps its size on a small screen. */
+  compact?: boolean
 }) {
-  const W = 760
+  const W = compact ? 400 : 760
   const top = standalone && legend ? 40 : 16
-  const H = 540 + top - 16
-  const m = { l: 52, r: 16, t: top, b: 52 }
+  const H = (compact ? 470 : 540) + top - 16
+  const m = { l: compact ? 40 : 52, r: compact ? 8 : 16, t: top, b: compact ? 44 : 52 }
+  const fs = compact ? 10.5 : 11.5
   const x = logScale(xTicks[0]!, xTicks.at(-1)!, m.l, W - m.r)
   const y = linScale(yTicks[0]!, yTicks.at(-1)!, H - m.b, m.t)
-  const charW = 6.7
-  const lh = 14
+  const charW = compact ? 6.1 : 6.7
+  const lh = compact ? 13 : 14
   const pts = points.map((p) => ({ p, px: x(p.x), py: y(p.y) }))
   const pointBoxes: Box[] = pts.map(({ px, py }) => ({ x: px - 7, y: py - 7, w: 14, h: 14 }))
   const boxes: Box[] = [...pointBoxes]
@@ -243,34 +247,34 @@ export function Scatter({
       {yTicks.map((t) => (
         <g>
           <line x1={m.l} x2={W - m.r} y1={y(t)} y2={y(t)} class="stroke-line" stroke-width="1" />
-          <text x={m.l - 8} y={y(t) + 4} text-anchor="end" class="fill-muted" font-size="11">
-            {t.toFixed(2)}
+          <text x={m.l - 6} y={y(t) + 4} text-anchor="end" class="fill-muted" font-size={compact ? 10 : 11}>
+            {compact ? t.toFixed(1) : t.toFixed(2)}
           </text>
         </g>
       ))}
       {xTicks.map((t) => (
         <g>
           <line x1={x(t)} x2={x(t)} y1={m.t} y2={H - m.b} class="stroke-line" stroke-width="1" />
-          <text x={x(t)} y={H - m.b + 18} text-anchor="middle" class="fill-muted" font-size="11">
+          <text x={x(t)} y={H - m.b + 16} text-anchor="middle" class="fill-muted" font-size={compact ? 10 : 11}>
             {tickLabel(t)}
           </text>
         </g>
       ))}
-      <text x={(m.l + W - m.r) / 2} y={H - 10} text-anchor="middle" class="fill-muted" font-size="12">
+      <text x={(m.l + W - m.r) / 2} y={H - 10} text-anchor="middle" class="fill-muted" font-size={compact ? 10.5 : 12}>
         {xTitle}
       </text>
-      <text x={14} y={(m.t + H - m.b) / 2} text-anchor="middle" class="fill-muted" font-size="12" transform={`rotate(-90 14 ${(m.t + H - m.b) / 2})`}>
+      <text x={12} y={(m.t + H - m.b) / 2} text-anchor="middle" class="fill-muted" font-size={compact ? 10.5 : 12} transform={`rotate(-90 12 ${(m.t + H - m.b) / 2})`}>
         {yTitle}
       </text>
       {labels.map((l) => (l.lead ? <line x1={l.px} y1={l.py} x2={l.ex} y2={l.ey} class="stroke-line-strong" stroke-width="1" /> : null))}
       {pts.map(({ p, px, py }) => (
-        <MarkSvg cx={px} cy={py} r={6} tone={p.tone} mark={p.mark} />
+        <MarkSvg cx={px} cy={py} r={compact ? 5 : 6} tone={p.tone} mark={p.mark} />
       ))}
       {labels.map((l) => (
         <text
           x={l.x}
           y={l.y}
-          font-size="11.5"
+          font-size={fs}
           class={l.p.tone === 'us' ? 'fill-fg' : undefined}
           style={l.p.tone === 'us' ? undefined : `fill:${toneVar(l.p.tone)}`}
           font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
@@ -303,11 +307,13 @@ export function Bars({ rows, max, label }: { rows: BarRow[]; max: number; label:
             {r.note ? <span class="text-[11px] text-muted sm:text-xs">{r.note}</span> : null}
           </span>
           <span class="flex min-h-9 items-center">
-            <span
-              class="h-2.5 min-w-1 rounded-full"
-              style={`width:${Math.max(0.5, Math.min(100, (r.value / max) * 100)).toFixed(1)}%;background:${toneVar(r.tone)}`}
-            ></span>
-            <span class="ml-2.5 text-[13px] font-medium whitespace-nowrap text-fg tabular-nums">{r.text}</span>
+            <span class="min-w-0 flex-1">
+              <span
+                class="block h-2.5 min-w-1 rounded-full"
+                style={`width:${Math.max(0.5, Math.min(100, (r.value / max) * 100)).toFixed(1)}%;background:${toneVar(r.tone)}`}
+              ></span>
+            </span>
+            <span class="ml-2.5 w-16 text-[13px] font-medium whitespace-nowrap text-fg tabular-nums">{r.text}</span>
           </span>
         </div>
       ))}
@@ -390,6 +396,7 @@ export function DotPlot({
   ticks,
   label,
   standalone,
+  compact,
 }: {
   rows: { label: string; values: Record<string, number | undefined> }[]
   series: DotSeries[]
@@ -397,10 +404,13 @@ export function DotPlot({
   label: string
   /** Render as its own .svg file, with its colours and the legend inside. */
   standalone?: boolean
+  /** The phone layout: a narrower canvas, so the text keeps its size on a small screen. */
+  compact?: boolean
 }) {
-  const W = 760
-  const rowH = 24
-  const m = { l: 150, r: 16, t: standalone ? 34 : 8, b: 34 }
+  const W = compact ? 400 : 760
+  const rowH = compact ? 22 : 24
+  const m = { l: compact ? 122 : 150, r: compact ? 10 : 16, t: standalone ? 34 : 8, b: 34 }
+  const shown = compact ? ticks.filter((t) => [5, 10, 100, 1000, 10000].includes(t)) : ticks
   const H = m.t + rows.length * rowH + m.b
   const x = logScale(ticks[0]!, ticks.at(-1)!, m.l, W - m.r)
   const sa = standaloneParts(W, H, standalone)
@@ -409,10 +419,10 @@ export function DotPlot({
       <title>{label}</title>
       {sa.head}
       {standalone ? <SvgLegend items={series} x={m.l} y={14} /> : null}
-      {ticks.map((t) => (
+      {shown.map((t) => (
         <g>
           <line x1={x(t)} x2={x(t)} y1={m.t} y2={H - m.b} class="stroke-line" stroke-width="1" />
-          <text x={x(t)} y={H - m.b + 16} text-anchor="middle" class="fill-muted" font-size="11">
+          <text x={x(t)} y={H - m.b + 16} text-anchor="middle" class="fill-muted" font-size={compact ? 10 : 11}>
             {tickLabel(t)}
           </text>
         </g>
@@ -427,7 +437,7 @@ export function DotPlot({
         const hi = vals.length ? Math.max(...vals) : 0
         return (
           <g>
-            <text x={m.l - 10} y={cy + 4} text-anchor="end" font-size="11" class="fill-fg" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">
+            <text x={m.l - 8} y={cy + 4} text-anchor="end" font-size={compact ? 10 : 11} class="fill-fg" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">
               {r.label}
             </text>
             {vals.length > 1 ? <line x1={x(lo)} x2={x(hi)} y1={cy} y2={cy} class="stroke-line-strong" stroke-width="2" /> : null}
@@ -437,7 +447,7 @@ export function DotPlot({
               return (
                 <g>
                   <title>{`${r.label} on ${s.label}: ${Math.round(v)} ms`}</title>
-                  <MarkSvg cx={x(v)} cy={cy} r={5.5} tone={s.tone} mark={s.mark} />
+                  <MarkSvg cx={x(v)} cy={cy} r={compact ? 5 : 5.5} tone={s.tone} mark={s.mark} />
                 </g>
               )
             })}
@@ -448,15 +458,13 @@ export function DotPlot({
   )
 }
 
-/**
- * A wide chart on a narrow screen: it keeps a readable size and scrolls sideways inside its own
- * box (the page itself never scrolls sideways).
- */
-export function Wide({ children }: { children: Child }) {
+/** A chart drawn twice: the full layout from sm up, the compact one on a phone. */
+export function Responsive({ wide, compact }: { wide: Child; compact: Child }) {
   return (
-    <div class="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-      <div class="min-w-[38rem]">{children}</div>
-    </div>
+    <>
+      <div class="hidden sm:block">{wide}</div>
+      <div class="sm:hidden">{compact}</div>
+    </>
   )
 }
 

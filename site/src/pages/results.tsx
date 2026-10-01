@@ -7,7 +7,7 @@
  * blues and CPUs in oranges, Vulkan purple, a parity check green or red. Everything else is ink.
  */
 import type { Child } from 'hono/jsx'
-import { Bars, DotPlot, Figure, Heatmap, Scatter, toneVar, Wide, type DotSeries, type SeriesKey, type Tone } from '../components/charts'
+import { Bars, DotPlot, Figure, Heatmap, Responsive, Scatter, toneVar, type DotSeries, type SeriesKey, type Tone } from '../components/charts'
 import { textLink } from '../components/ui'
 import {
   latencyRuns,
@@ -20,6 +20,7 @@ import {
   shortName,
   type CrossDevice,
   type DeviceSeries,
+  type Machine,
   type ParityResult,
   type PublicResult,
 } from '../data/results'
@@ -43,13 +44,14 @@ const SUBSET_LABELS: Record<string, string> = {
 const nf = new Intl.NumberFormat('en-US')
 
 const sections = [
+  { id: 'bench', label: 'Test bench' },
   { id: 'accuracy', label: 'Accuracy and speed' },
   { id: 'calibration', label: 'Calibration' },
   { id: 'datasets', label: 'By dataset' },
   { id: 'speed', label: 'Speed' },
   { id: 'windows', label: 'CUDA and Vulkan' },
   { id: 'parity', label: 'Parity' },
-  { id: 'machines', label: 'Machines and data' },
+  { id: 'data', label: 'Raw data' },
 ]
 
 const label = (r: PublicResult) => (r.server === 'ollama' ? `${r.model} (Ollama)` : r.model)
@@ -193,9 +195,7 @@ function AccuracySpeed() {
           </>
         }
       >
-        <Wide>
-          <Scatter {...chart} />
-        </Wide>
+        <Responsive wide={<Scatter {...chart} />} compact={<Scatter {...chart} compact />} />
       </Figure>
     </Section>
   )
@@ -303,9 +303,7 @@ function Speed() {
         legend={chart.series}
         notes={`Ollaya ${latencyRuns[0]?.ollaya ?? ''}, Linux under WSL2. Each model: one load, ${gpuRun?.protocol?.warm ?? 5} untimed requests, then ${gpuRun?.protocol?.n ?? 20} timed ones${cpuRun ? ` (on the CPU ${cpuRun.protocol?.warm ?? 2} and ${cpuRun.protocol?.n ?? 10})` : ''}. A missing dot: the model did not run there or is still being measured.`}
       >
-        <Wide>
-          <DotPlot {...chart} />
-        </Wide>
+        <Responsive wide={<DotPlot {...chart} />} compact={<DotPlot {...chart} compact />} />
       </Figure>
     </Section>
   )
@@ -395,7 +393,8 @@ function Parity() {
                   return (
                     <td class="px-4 py-2 whitespace-nowrap">
                       <span class="font-medium" style={`color:${toneVar(c.pass ? 'pass' : 'fail')}`}>
-                        {c.pass ? '✓ passed' : '✗ outside'}
+                        {c.pass ? '✓' : '✗'}
+                        <span class="hidden sm:inline">{c.pass ? ' passed' : ' outside'}</span>
                       </span>
                       {c.q ? <span class="text-muted"> {nf.format(c.q)} q</span> : null}
                     </td>
@@ -442,53 +441,103 @@ function Parity() {
   )
 }
 
-function Machines() {
+/** One of our machines as a spec column: what it is, then what we measure on it. */
+function BenchColumn({ m }: { m: Machine }) {
+  const gpu = m.gpus[0] ?? ''
+  const rows: [string, string][] = [
+    ['GPU', gpu.replace(/^NVIDIA GeForce /, '')],
+    ['CPU', m.cpu],
+    ['Memory', m.ram_gb ? `${m.ram_gb} GB` : ''],
+    ['System', m.os],
+    ['Driver', m.driver ?? ''],
+  ]
   return (
-    <Section id="machines" title="Machines and data" lead="Where the numbers come from.">
-      <div class="grid gap-4 md:grid-cols-2">
-        {Object.values(machines).map((m) => (
-          <div class="rounded-xl border border-line p-5">
-            <p class="text-sm font-medium text-fg">{m.label}</p>
-            <dl class="mt-3 grid grid-cols-[4.5rem_minmax(0,1fr)] gap-x-3 gap-y-1 text-[13px]">
-              <dt class="text-muted">CPU</dt>
-              <dd class="text-body">{m.cpu}</dd>
-              <dt class="text-muted">GPU</dt>
-              <dd class="text-body">{m.gpus.join(', ')}</dd>
-              {m.ram_gb ? (
-                <>
-                  <dt class="text-muted">Memory</dt>
-                  <dd class="text-body">{m.ram_gb} GB</dd>
-                </>
-              ) : null}
-              <dt class="text-muted">System</dt>
-              <dd class="text-body">{m.os}</dd>
-              {m.by ? (
-                <>
-                  <dt class="text-muted">By</dt>
-                  <dd class="text-body">
-                    <a href={m.source} class={textLink}>
-                      {m.by}
-                    </a>
-                  </dd>
-                </>
-              ) : null}
-            </dl>
-          </div>
+    <div class="border-t-2 border-fg pt-5">
+      <h3 class="text-3xl font-semibold tracking-tight text-fg">{m.headline ?? m.label}</h3>
+      <p class="mt-1 text-sm text-muted">{m.label}</p>
+      <dl class="mt-5 space-y-2.5 text-[13px] leading-snug">
+        {rows
+          .filter(([, v]) => v)
+          .map(([k, v]) => (
+            <div class="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-x-3">
+              <dt class="text-muted">{k}</dt>
+              <dd class="text-body">{v}</dd>
+            </div>
+          ))}
+      </dl>
+      {m.uses?.length ? (
+        <>
+          <p class="mt-6 text-[13px] font-medium text-fg">Measured here</p>
+          <ul class="mt-2 space-y-1.5 text-[13px] leading-snug text-body" role="list">
+            {m.uses.map((u) => (
+              <li class="flex gap-2">
+                <span class="mt-[0.45rem] size-1 shrink-0 rounded-full bg-muted" aria-hidden="true"></span>
+                {u}
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+    </div>
+  )
+}
+
+function TestBench() {
+  const ours = Object.values(machines).filter((m) => m.kind !== 'community')
+  const community = Object.values(machines).filter((m) => m.kind === 'community')
+  return (
+    <Section
+      id="bench"
+      title="Test bench"
+      lead="The machines behind these numbers."
+      body="Two desktops with NVIDIA GPUs and a Mac mini. Every number on this page was measured on one of them, with the same model files that ollaya pull fetches from each author's repository."
+    >
+      <div class="grid gap-x-10 gap-y-12 md:grid-cols-3">
+        {ours.map((m) => (
+          <BenchColumn m={m} />
         ))}
       </div>
-      <p class="mt-8 max-w-3xl text-[13px] leading-relaxed text-muted">
-        Every chart on this page is drawn from these files, as the measuring tools wrote them:{' '}
-        {runs.map((r, i) => (
+      <p class="mt-10 max-w-3xl text-[13px] leading-relaxed text-muted">
+        Software: Ollaya {latencyRuns[0]?.ollaya ?? '0.8.0'}, which runs ONNX models on ONNX Runtime (with NVIDIA's CUDA 13 libraries on the
+        GPUs), GGUF models on llama.cpp build b11146, and laya and nli on the Apple GPU through MLX.
+        {community.length ? (
           <>
-            {i ? ', ' : ''}
-            <a href={`/data/results/${r.file}`} class={textLink}>
+            {' '}
+            Community benches, measured by contributors with the same tools:{' '}
+            {community.map((m, i) => (
+              <>
+                {i ? '; ' : ''}
+                {m.label.replace(/ \(community\)$/, '')} ({m.cpu.replace(/ \(.*$/, '')}), by{' '}
+                <a href={m.source} class={textLink}>
+                  {m.by}
+                </a>
+              </>
+            ))}
+            .
+          </>
+        ) : null}
+      </p>
+    </Section>
+  )
+}
+
+function RawData() {
+  return (
+    <Section id="data" title="Raw data" lead="Every number, as the tools wrote it.">
+      <p class="max-w-3xl text-[15px] leading-relaxed text-body">
+        Each chart on this page is drawn from these files. The tools that wrote them are in the repository (
+        <span class="font-mono text-[13px]">convert/ollaya_convert/bench_public.py</span>, <span class="font-mono text-[13px]">bench_latency.py</span> and
+        the parity examples), so you can run the same measurements on your own hardware.
+      </p>
+      <ul class="mt-6 space-y-1.5 font-mono text-[12px] sm:text-[13px]" role="list">
+        {runs.map((r) => (
+          <li>
+            <a href={`/data/results/${r.file}`} class={`${textLink} break-all`}>
               {r.file}
             </a>
-          </>
+          </li>
         ))}
-        . The tools are in the repository (<span class="font-mono">convert/ollaya_convert/bench_public.py</span>,{' '}
-        <span class="font-mono">bench_latency.py</span> and the parity examples), so anyone can run them on their own hardware.
-      </p>
+      </ul>
     </Section>
   )
 }
@@ -528,13 +577,14 @@ export function ResultsPage() {
           </ul>
         </nav>
         <div class="min-w-0 space-y-24 md:space-y-32">
+          <TestBench />
           <AccuracySpeed />
           <Calibration />
           <ByDataset />
           <Speed />
           <WindowsGpus />
           <Parity />
-          <Machines />
+          <RawData />
         </div>
       </div>
     </>

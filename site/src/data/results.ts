@@ -8,6 +8,12 @@ import { machinesRaw, runsRaw } from '../generated/results'
 
 export interface Machine {
   label: string
+  /** The part a reader recognises it by: its GPU, or the chip. */
+  headline?: string
+  /** Our own test bench, or a community measurement. */
+  kind?: 'ours' | 'community'
+  /** What we measure on it. */
+  uses?: string[]
   cpu: string
   gpus: string[]
   ram_gb?: number

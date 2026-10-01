@@ -271,8 +271,10 @@ function ScoreRow({ label, note, acc, latency, pick, muted }: { label: string; n
         {note ? <span class="text-xs text-muted">{note}</span> : null}
       </span>
       <span class="relative flex h-9 items-center">
-        <span class={`h-2.5 min-w-1 rounded-full ${muted ? 'bg-them' : 'bg-us'}`} style={`width:${accPct(acc)}`}></span>
-        <span class={`ml-2.5 text-[13px] whitespace-nowrap tabular-nums ${muted ? 'text-body' : 'font-medium text-fg'}`}>{acc.toFixed(3)}</span>
+        <span class="min-w-0 flex-1">
+          <span class={`block h-2.5 min-w-1 rounded-full ${muted ? 'bg-them' : 'bg-us'}`} style={`width:${accPct(acc)}`}></span>
+        </span>
+        <span class={`ml-2.5 w-11 text-[13px] whitespace-nowrap tabular-nums ${muted ? 'text-body' : 'font-medium text-fg'}`}>{acc.toFixed(3)}</span>
       </span>
       <span class={`flex h-9 items-center justify-end text-[13px] whitespace-nowrap tabular-nums ${muted ? 'text-body' : 'text-fg'} ${pick ? 'font-semibold' : ''}`}>
         {latency}
@@ -312,7 +314,8 @@ function Fast() {
             ))}
           </ul>
           <span></span>
-          <span class="relative mt-2 h-5 border-t border-line text-[11px] text-muted tabular-nums" aria-hidden="true">
+          {/* The axis spans the bars' track: the column less the value beside each bar (ml-2.5 + w-11). */}
+          <span class="relative mt-2 mr-[3.375rem] h-5 border-t border-line text-[11px] text-muted tabular-nums" aria-hidden="true">
             {ACC_AXIS.map((t) => (
               <span
                 class={`absolute top-1.5 whitespace-nowrap ${t === 0 ? '' : t === ACC_SCALE ? '-translate-x-full' : '-translate-x-1/2'}`}
@@ -378,23 +381,32 @@ const vsFeatures: { label: string; ollaya: string; ollama: string }[] = [
   { label: 'Weights', ollaya: "The author's files, pinned by commit and sha256", ollama: 'Converted to GGUF and re-hosted' },
 ]
 
+/**
+ * One comparison row. Each row is its own grid with the same columns, so the bar can drop to a line
+ * of its own on a phone (model, ECE and latency on top, the full-width bar under them) and sit
+ * between the model and the numbers from sm up.
+ */
 function VsBar({ run }: { run: VsRun }) {
   const ollama = run.server === 'ollama'
   return (
-    <li class="contents">
-      <span class="flex h-9 flex-col justify-center leading-tight">
+    <li class={VS_GRID}>
+      <span class="order-1 flex min-h-9 flex-col justify-center leading-tight sm:order-none">
         <span class="font-mono text-xs text-fg sm:text-[13px]">{run.tag}</span>
         <span class="text-xs text-muted">{ollama ? 'on Ollama 0.35' : 'on Ollaya'}</span>
       </span>
-      <span class="relative flex h-9 items-center">
-        <span class={`h-2.5 min-w-1 rounded-full ${ollama ? 'bg-them' : 'bg-us'}`} style={`width:${vsPct(run.acc)}`}></span>
-        <span class={`ml-2.5 text-[13px] whitespace-nowrap tabular-nums ${ollama ? 'text-body' : 'font-medium text-fg'}`}>{run.acc.toFixed(3)}</span>
+      <span class="relative order-4 col-span-3 flex h-6 items-center sm:order-none sm:col-span-1 sm:h-9">
+        <span class="min-w-0 flex-1">
+          <span class={`block h-2.5 min-w-1 rounded-full ${ollama ? 'bg-them' : 'bg-us'}`} style={`width:${vsPct(run.acc)}`}></span>
+        </span>
+        <span class={`ml-2.5 w-11 text-[13px] whitespace-nowrap tabular-nums ${ollama ? 'text-body' : 'font-medium text-fg'}`}>{run.acc.toFixed(3)}</span>
       </span>
-      <span class={`flex h-9 items-center justify-end text-[13px] tabular-nums ${ollama ? 'text-body' : 'text-fg'}`}>{run.ece.toFixed(3)}</span>
-      <span class={`flex h-9 items-center justify-end text-[13px] whitespace-nowrap tabular-nums ${ollama ? 'text-body' : 'text-fg'}`}>{run.ms} ms</span>
+      <span class={`order-2 flex min-h-9 items-center justify-end text-[13px] tabular-nums sm:order-none ${ollama ? 'text-body' : 'text-fg'}`}>{run.ece.toFixed(3)}</span>
+      <span class={`order-3 flex min-h-9 items-center justify-end text-[13px] whitespace-nowrap tabular-nums sm:order-none ${ollama ? 'text-body' : 'text-fg'}`}>{run.ms} ms</span>
     </li>
   )
 }
+
+const VS_GRID = 'grid grid-cols-[minmax(0,1fr)_3.5rem_4.5rem] gap-x-3 sm:grid-cols-[9.5rem_minmax(0,1fr)_4rem_5rem] sm:gap-x-4'
 
 function VersusOllama() {
   return (
@@ -419,12 +431,14 @@ function VersusOllama() {
           Same GPU, same 3,880 human-labeled questions{' '}
           <span class="font-normal text-muted">· accuracy, higher is better; calibration error and latency, lower is better</span>
         </figcaption>
-        <div class="mt-6 grid grid-cols-[6.5rem_minmax(0,1fr)_3rem_4.5rem] gap-x-3 sm:grid-cols-[9.5rem_minmax(0,1fr)_4rem_5rem] sm:gap-x-4">
-          <span class="text-xs text-muted">Model</span>
-          <span class="text-xs text-muted">Accuracy</span>
-          <span class="text-right text-xs text-muted">ECE</span>
-          <span class="text-right text-xs text-muted">Latency</span>
-          <ul class="contents" role="list">
+        <div class="mt-6">
+          <div class={VS_GRID} aria-hidden="true">
+            <span class="text-xs text-muted">Model</span>
+            <span class="hidden text-xs text-muted sm:block">Accuracy</span>
+            <span class="text-right text-xs text-muted">ECE</span>
+            <span class="text-right text-xs text-muted">Latency</span>
+          </div>
+          <ul class="mt-1 space-y-2 sm:space-y-0" role="list">
             {vsRuns.map((r) => (
               <VsBar run={r} />
             ))}

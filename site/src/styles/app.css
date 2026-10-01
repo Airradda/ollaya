@@ -269,6 +269,16 @@
   .prose td code {
     white-space: nowrap;
   }
+  /* On a phone a table keeps readable columns and scrolls inside its frame (.table-wrap) rather
+     than squeezing every column to a few words per line. */
+  @media (max-width: 639px) {
+    .prose td {
+      min-width: 8.5rem;
+    }
+    .prose td:first-child {
+      min-width: 6.5rem;
+    }
+  }
   .prose img {
     max-width: 100%;
   }
@@ -301,6 +311,21 @@
   }
   .tok-punct {
     color: var(--color-tok-punct);
+  }
+}
+
+/* A code block's copy button sits over the code: an opaque face with a short fade to its left,
+   so a long line scrolling under it stays readable instead of running into the icon. */
+@layer components {
+  .copy-over {
+    background-color: var(--color-code);
+    /* A fade on its left, and the 0.5rem between it and the block's edge filled. */
+    box-shadow:
+      -14px 0 10px -2px var(--color-code),
+      8px 0 0 0 var(--color-code);
+  }
+  .copy-over:hover {
+    background-color: color-mix(in oklab, var(--color-fg) 6%, var(--color-code));
   }
 }
 
