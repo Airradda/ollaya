@@ -125,9 +125,10 @@ speed on every machine, and parity with the authors' own code on each device.
   Ollama's best, Nimble, scores 0.749 at 210 ms.
 - **Calibration.** On the same Nimble weights, the calibration error is 0.022 on Ollaya and 0.122
   on Ollama: Ollaya applies each model's fitted temperature.
-- **Speed.** Every model on an RTX 5090 and an RTX 4090, five questions per request through the
-  HTTP API: 7 to 35 ms for the encoders (`laya`, `nli`, `gliclass`, `von`, `qwen3guard`), 0.1 to
-  0.7 s for the decoders, and 1.8 s for `nimble:9b`. The CPU numbers follow on the results page.
+- **Speed.** Every model on an RTX 5090, an RTX 4090 and two CPUs (Threadripper 3960X,
+  i9-13900K), five questions per request through the HTTP API. The encoders (`laya`, `nli`,
+  `gliclass`, `von`, `qwen3guard`) take 7 to 35 ms on a GPU and 0.3 to 2.4 s on a CPU; the decoders
+  0.1 to 0.9 s on a GPU and 1.3 to 25 s on a CPU; `nimble:9b` 1.8 to 2.3 s on a GPU.
 - **Parity.** Before a model ships, its runtime is checked question by question against the
   authors' code (or llama.cpp's own server, for GGUF models) on each device it runs on.
 

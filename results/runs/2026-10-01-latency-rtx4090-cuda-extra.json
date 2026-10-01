@@ -12,7 +12,7 @@
   "n": 20,
   "client": "one request at a time over HTTP to /api/decide, timed by the client; each request a different short message, in turn"
  },
- "note": "",
+ "note": "nimble:9b and jeeves:9b were timed again the same day, after their weights in this model store were replaced with real files (ONNX Runtime refuses external data behind a symlink).",
  "results": [
   {
    "model": "jeb:4b",
@@ -59,12 +59,30 @@
   {
    "model": "nimble:9b",
    "questions": "triage",
-   "error": "HTTP 500: {\"error\":\"nimble:9b failed to load: Error: onnx runtime: External data path validation failed for initializer: w:model.safetensors-00001-of-00004.safetensors:model.language_model.embed_tokens.weight. Error: External data path escapes model directory. External data path: \\\"sha256-db6f444b43d318c92f36"
+   "load_ms": 75806.2,
+   "first_request_ms": 78122.6,
+   "answered_by": "nimble:9b",
+   "p50_ms": 2276.1,
+   "p90_ms": 2281.4,
+   "min_ms": 2263.9,
+   "eval_p50_ms": 2271.1,
+   "input_tokens": 2978,
+   "device": "cuda:0",
+   "precision": "F32"
   },
   {
    "model": "jeeves:9b",
    "questions": "triage",
-   "error": "HTTP 500: {\"error\":\"jeeves:9b failed to load: Error: onnx runtime: External data path validation failed for initializer: w:model-00001-of-00005.safetensors:model.embed_tokens.weight. Error: External data path escapes model directory. External data path: \\\"sha256-c8d38178b51c845d6befca9e2c8a579889055cecf510fdb"
+   "load_ms": 61873.9,
+   "first_request_ms": 62790.0,
+   "answered_by": "jeeves:9b",
+   "p50_ms": 864.1,
+   "p90_ms": 872.2,
+   "min_ms": 862.7,
+   "eval_p50_ms": 859.5,
+   "input_tokens": 503,
+   "device": "cuda:0",
+   "precision": "F32"
   },
   {
    "model": "clm:8b",
