@@ -18,6 +18,8 @@
   <a href="https://huggingface.co/ollaya-dev">Hugging Face</a>
 </p>
 
+<p align="center">Created and maintained by <a href="https://github.com/cobanov">Mert Cobanov</a> (<a href="https://x.com/mertcobanov">@mertcobanov</a>).</p>
+
 A decision model reads a *state* (a message, an email, a ticket, any JSON) plus typed questions
 (`choice`, `score`, `noul`) and returns calibrated probabilities in a single forward pass, in
 milliseconds. It never generates text. Ollaya pulls these models by name, serves them from a
