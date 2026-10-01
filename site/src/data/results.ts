@@ -160,5 +160,9 @@ export function latencySeries(): DeviceSeries[] {
     }
     for (const r of run.results) if (r.p50_ms !== undefined && !r.error) s.p50.set(shortName(r.model), r.p50_ms)
   }
-  return [...byKey.values()].sort((a, b) => Number(a.device === 'cpu') - Number(b.device === 'cpu') || a.key.localeCompare(b.key))
+  // GPUs before CPUs; within each, the machines in machines.json order.
+  const order = Object.keys(machines)
+  return [...byKey.values()].sort(
+    (a, b) => Number(a.device === 'cpu') - Number(b.device === 'cpu') || order.indexOf(a.machine) - order.indexOf(b.machine) || a.key.localeCompare(b.key),
+  )
 }

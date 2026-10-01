@@ -271,7 +271,7 @@ function ScoreRow({ label, note, acc, latency, pick, muted }: { label: string; n
         {note ? <span class="text-xs text-muted">{note}</span> : null}
       </span>
       <span class="relative flex h-9 items-center">
-        <span class={`h-2.5 min-w-1 rounded-full ${muted ? 'bg-bar-muted' : 'lat-bar'}`} style={`width:${accPct(acc)}`}></span>
+        <span class={`h-2.5 min-w-1 rounded-full ${muted ? 'bg-them' : 'bg-us'}`} style={`width:${accPct(acc)}`}></span>
         <span class={`ml-2.5 text-[13px] whitespace-nowrap tabular-nums ${muted ? 'text-body' : 'font-medium text-fg'}`}>{acc.toFixed(3)}</span>
       </span>
       <span class={`flex h-9 items-center justify-end text-[13px] whitespace-nowrap tabular-nums ${muted ? 'text-body' : 'text-fg'} ${pick ? 'font-semibold' : ''}`}>
@@ -387,7 +387,7 @@ function VsBar({ run }: { run: VsRun }) {
         <span class="text-xs text-muted">{ollama ? 'on Ollama 0.35' : 'on Ollaya'}</span>
       </span>
       <span class="relative flex h-9 items-center">
-        <span class={`h-2.5 min-w-1 rounded-full ${ollama ? 'bg-bar-muted' : 'lat-bar'}`} style={`width:${vsPct(run.acc)}`}></span>
+        <span class={`h-2.5 min-w-1 rounded-full ${ollama ? 'bg-them' : 'bg-us'}`} style={`width:${vsPct(run.acc)}`}></span>
         <span class={`ml-2.5 text-[13px] whitespace-nowrap tabular-nums ${ollama ? 'text-body' : 'font-medium text-fg'}`}>{run.acc.toFixed(3)}</span>
       </span>
       <span class={`flex h-9 items-center justify-end text-[13px] tabular-nums ${ollama ? 'text-body' : 'text-fg'}`}>{run.ece.toFixed(3)}</span>
@@ -468,7 +468,12 @@ function VersusOllama() {
         probability over all 3,880 questions. Latency: median request (one question), HTTP included. A rejected request
         counts as a wrong answer. On the same Nimble weights Ollama is faster (it runs Q8_0 on llama.cpp; Ollaya computes in
         fp32 and repeats the request for each question), and Ollaya is calibrated: it applies the author's temperature,
-        Ollama returns the raw softmax. Jeb, Jeeves and Cygnet joined after this run.
+        Ollama returns the raw softmax. Jeb, Jeeves and Cygnet joined after this run. Every model, machine and dataset, with
+        the raw data:{' '}
+        <a href="/results" class={textLink}>
+          results
+        </a>
+        .
       </p>
     </Section>
   )

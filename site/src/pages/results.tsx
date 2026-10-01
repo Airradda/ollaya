@@ -2,9 +2,12 @@
  * /results: everything we measure, drawn from ../results (src/data/results.ts). Accuracy and
  * calibration on Bespoke Labs' public benchmark (with Ollama on the same GPU), speed of every
  * model on every machine, and parity with the authors' own code on each device.
+ *
+ * Colour carries data only (charts.tsx): Ollaya blue against the other server's orange, GPUs in
+ * blues and CPUs in oranges, Vulkan purple, a parity check green or red. Everything else is ink.
  */
 import type { Child } from 'hono/jsx'
-import { Bars, DotPlot, Figure, Heatmap, Legend, Scatter, type DotSeries } from '../components/charts'
+import { Bars, DotPlot, Figure, Heatmap, Scatter, toneVar, Wide, type DotSeries, type SeriesKey, type Tone } from '../components/charts'
 import { textLink } from '../components/ui'
 import {
   latencyRuns,
@@ -16,6 +19,7 @@ import {
   runs,
   shortName,
   type CrossDevice,
+  type DeviceSeries,
   type ParityResult,
   type PublicResult,
 } from '../data/results'
@@ -36,22 +40,39 @@ const SUBSET_LABELS: Record<string, string> = {
   pubmedqa: 'PubMedQA',
 }
 
-const SERIES_COLORS = [
-  'var(--color-series-1)',
-  'var(--color-series-2)',
-  'var(--color-series-3)',
-  'var(--color-series-4)',
-  'var(--color-series-5)',
-  'var(--color-series-6)',
-]
-
 const nf = new Intl.NumberFormat('en-US')
 
+const sections = [
+  { id: 'accuracy', label: 'Accuracy and speed' },
+  { id: 'calibration', label: 'Calibration' },
+  { id: 'datasets', label: 'By dataset' },
+  { id: 'speed', label: 'Speed' },
+  { id: 'windows', label: 'CUDA and Vulkan' },
+  { id: 'parity', label: 'Parity' },
+  { id: 'machines', label: 'Machines and data' },
+]
+
 const label = (r: PublicResult) => (r.server === 'ollama' ? `${r.model} (Ollama)` : r.model)
+const tone = (r: PublicResult): Tone => (r.server === 'ollama' ? 'them' : 'us')
+const rejectedNote = (r: PublicResult) => (r.errors > r.records * 0.05 ? `${Math.round((r.errors / r.records) * 100)} % rejected` : undefined)
+
+/** The two servers of the public benchmark, as the legends name them. */
+function serverKeys(): SeriesKey[] {
+  const v = publicBench?.servers ?? {}
+  return [
+    { label: `Ollaya ${v.ollaya?.split(' ')[0] ?? ''}`.trim(), tone: 'us' },
+    { label: `Ollama ${v.ollama ?? ''}`.trim(), tone: 'them', mark: 'ring' },
+  ]
+}
+
+/** A GPU in blue, a CPU in orange, Vulkan in purple. */
+function deviceTone(s: DeviceSeries): Tone {
+  return s.device === 'vulkan' ? 'vulkan' : s.device === 'cpu' ? 'cpu' : 'gpu'
+}
 
 function Section({ id, title, lead, body, children }: { id: string; title: string; lead: string; body?: Child; children: Child }) {
   return (
-    <section id={id} aria-labelledby={`${id}-title`} class="scroll-mt-24">
+    <section id={id} aria-labelledby={`${id}-title`} class="scroll-mt-24" data-section>
       <h2 id={`${id}-title`} class="text-base font-semibold text-fg">
         {title}
       </h2>
@@ -83,9 +104,7 @@ function totals() {
   const models = new Set<string>()
   for (const r of publicRuns) for (const x of r.results) if (x.server === 'ollaya') models.add(x.model)
   for (const r of latencyRuns) for (const x of r.results) if (!x.error) models.add(shortName(x.model))
-  const devices = new Set<string>()
-  for (const r of latencyRuns) devices.add(`${r.machine}/${r.device}`)
-  return { answers, requests, parityQuestions, models: models.size, devices: devices.size }
+  return { answers, requests, parityQuestions, models: models.size }
 }
 
 function Overview() {
@@ -100,11 +119,7 @@ function Overview() {
         <Stat value={`${t.models}`} label="models measured" />
       </div>
       <div class="border-t border-line sm:border-l lg:border-t-0">
-        {t.requests ? (
-          <Stat value={nf.format(t.requests)} label="requests timed on our GPUs and CPUs" />
-        ) : (
-          <Stat value={`${t.devices}`} label="machines and devices timed" />
-        )}
+        <Stat value={nf.format(t.requests)} label="requests timed on our GPUs and CPUs" />
       </div>
     </div>
   )
@@ -114,22 +129,27 @@ function Overview() {
 export function accuracyScatter() {
   const results = (publicBench?.results ?? []).filter((r) => r.errors < r.records * 0.05)
   return {
-    points: results.map((r) => ({ label: label(r), x: r.median_ms, y: r.macro_accuracy, muted: r.server === 'ollama' })),
+    points: results.map((r) => ({ label: r.model, x: r.median_ms, y: r.macro_accuracy, tone: tone(r), mark: r.server === 'ollama' ? ('ring' as const) : undefined })),
     xTicks: [10, 20, 50, 100, 200, 500],
     yTicks: [0.4, 0.5, 0.6, 0.7, 0.8],
-    xTitle: 'median latency per question (ms)',
+    xTitle: 'median latency per question (ms), log scale',
     yTitle: 'accuracy',
-    label: "Accuracy against median latency on Bespoke Labs' public benchmark, RTX 5090",
+    label: "Accuracy against median latency on Bespoke Labs' public benchmark, RTX 5090, Ollaya and Ollama",
+    legend: serverKeys(),
   }
 }
 
 /** The speed chart's data: one row per model, one series per machine and device. */
 export function speedDots() {
   const series = latencySeries()
-  const dots: DotSeries[] = series.map((s, i) => ({
+  // Colour says GPU or CPU; the mark says which machine: the first machine's dots are filled,
+  // the others' are rings, so two machines on the same device type stay apart where they overlap.
+  const machineOrder = Object.keys(machines)
+  const dots: DotSeries[] = series.map((s) => ({
     key: s.key,
-    label: `${s.label} (${s.detail === 'CPU' ? 'CPU' : s.detail})`,
-    color: SERIES_COLORS[i % SERIES_COLORS.length]!,
+    label: s.device === 'cpu' ? `${s.label} CPU` : s.label,
+    tone: deviceTone(s),
+    mark: machineOrder.indexOf(s.machine) === 0 ? 'dot' : 'ring',
   }))
   const models = new Set<string>()
   for (const s of series) for (const m of s.p50.keys()) models.add(m)
@@ -141,7 +161,7 @@ export function speedDots() {
     rows,
     series: dots,
     ticks: [5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000],
-    label: 'Median latency of five-question requests per model and device',
+    label: 'Median latency of five-question requests per model, on each GPU and CPU we measured',
   }
 }
 
@@ -151,27 +171,31 @@ function AccuracySpeed() {
   const ollama = publicBench.results.filter((r) => r.server === 'ollama')
   const best = results.filter((r) => r.server === 'ollaya').sort((a, b) => b.macro_accuracy - a.macro_accuracy)[0]
   const bestOllama = [...ollama].sort((a, b) => b.macro_accuracy - a.macro_accuracy)[0]
+  const chart = accuracyScatter()
   return (
     <Section
       id="accuracy"
       title="Accuracy and speed"
       lead="More accurate and faster than Ollama, on the same GPU."
-      body={`Bespoke Labs' public decision benchmark: ${nf.format(3880)} human-labeled questions from 13 datasets, scored with Bespoke's own code, one request at a time on one RTX 5090. Ollaya ${publicBench.servers.ollaya?.split(' ')[0]} against Ollama ${publicBench.servers.ollama}.`}
+      body={`Bespoke Labs' public decision benchmark: ${nf.format(3880)} human-labeled questions from 13 datasets, scored with Bespoke's own code, one request at a time on one RTX 5090.`}
     >
       <Figure
         title="Accuracy against latency"
-        sub="up and to the left is better; hollow points are Ollama"
+        sub="up and to the left is better"
+        legend={chart.legend}
         notes={
           <>
-            Accuracy: the mean over the 13 datasets. Latency: the median request (one question), HTTP included, log scale.
+            Accuracy: the mean over the 13 datasets. Latency: the median request (one question), HTTP included.
             {best && bestOllama
               ? ` The most accurate model, ${best.model}, scores ${best.macro_accuracy.toFixed(3)} at ${Math.round(best.median_ms)} ms; Ollama's best, ${bestOllama.model}, ${bestOllama.macro_accuracy.toFixed(3)} at ${Math.round(bestOllama.median_ms)} ms.`
               : ''}{' '}
-            Models that reject more than 5 % of the questions (option limits, long states) are left out of the chart and listed in the table under the heatmap.
+            Models that reject more than 5 % of the questions (option limits, long states) are left out of the chart; the table under the heatmap lists them.
           </>
         }
       >
-        <Scatter {...accuracyScatter()} />
+        <Wide>
+          <Scatter {...chart} />
+        </Wide>
       </Figure>
     </Section>
   )
@@ -190,14 +214,14 @@ function Calibration() {
       body={
         ollaya && ollama
           ? `Expected calibration error (ECE) measures how far a model's confidence is from how often it is right. On the same Nimble weights, Ollaya's ECE is ${ollaya.pooled_ece.toFixed(3)} and Ollama's ${ollama.pooled_ece.toFixed(3)}: Ollaya applies each model's fitted temperature, Ollama returns the raw softmax.`
-          : 'Expected calibration error (ECE) measures how far a model’s confidence is from how often it is right.'
+          : "Expected calibration error (ECE) measures how far a model's confidence is from how often it is right."
       }
     >
-      <Figure title="Calibration error, all 3,880 questions" sub="ten-bin ECE of the top probability; lower is better">
+      <Figure title="Calibration error, all 3,880 questions" sub="ten-bin ECE of the top probability; lower is better" legend={serverKeys()}>
         <Bars
           label="Calibration error per model"
           max={Math.max(...rows.map((r) => r.pooled_ece))}
-          rows={rows.map((r) => ({ label: label(r), value: r.pooled_ece, text: r.pooled_ece.toFixed(3), muted: r.server === 'ollama', note: r.errors > r.records * 0.05 ? `${Math.round((r.errors / r.records) * 100)} % rejected` : undefined }))}
+          rows={rows.map((r) => ({ label: label(r), value: r.pooled_ece, text: r.pooled_ece.toFixed(3), tone: tone(r), note: rejectedNote(r) }))}
         />
       </Figure>
     </Section>
@@ -215,21 +239,18 @@ function ByDataset() {
       lead="Where each model is strong, dataset by dataset."
       body="Fact checking, intent, reading comprehension, paraphrase, inference, toxicity, safety, helpfulness, summary quality and biomedical questions. Each cell is the share of questions answered like the human label, in percent."
     >
-      <Figure title="Accuracy per dataset (%)" sub="darker is higher; rows sorted by the mean">
+      <Figure title="Accuracy per dataset (%)" sub="darker is higher; rows sorted by the mean; Ollama's rows in orange">
         <Heatmap
           label="Accuracy per model and dataset"
           columns={columns}
           lo={0.3}
           hi={0.95}
-          rows={rows.map((r) => ({
-            label: label(r),
-            muted: r.server === 'ollama',
-            values: columns.map((c) => r.per_subset[c.key]?.accuracy ?? null),
-          }))}
+          rows={rows.map((r) => ({ label: label(r), tone: tone(r), values: columns.map((c) => r.per_subset[c.key]?.accuracy ?? null) }))}
         />
       </Figure>
       <div class="mt-10 overflow-x-auto rounded-2xl border border-line">
         <table class="w-full min-w-[40rem] text-left text-[13px] tabular-nums">
+          <caption class="sr-only">Accuracy by question type, calibration error, latency and rejected questions per model</caption>
           <thead class="border-b border-line bg-subtle text-muted">
             <tr>
               <th scope="col" class="px-4 py-2.5 font-medium">Model</th>
@@ -244,9 +265,9 @@ function ByDataset() {
           </thead>
           <tbody class="divide-y divide-line">
             {rows.map((r) => (
-              <tr class={r.server === 'ollama' ? 'text-muted' : 'text-body'}>
-                <th scope="row" class={`px-4 py-2 font-mono font-normal ${r.server === 'ollama' ? '' : 'text-fg'}`}>
-                  {label(r)}
+              <tr class="text-body">
+                <th scope="row" class="px-4 py-2 font-mono font-normal" style={r.server === 'ollama' ? `color:${toneVar('them')}` : undefined}>
+                  {r.server === 'ollama' ? label(r) : <span class="text-fg">{label(r)}</span>}
                 </th>
                 <td class="px-4 py-2 text-right">{r.macro_accuracy.toFixed(3)}</td>
                 <td class="px-4 py-2 text-right">{r.by_type.choice?.toFixed(3) ?? ''}</td>
@@ -267,23 +288,24 @@ function ByDataset() {
 function Speed() {
   if (!latencySeries().length) return null
   const chart = speedDots()
-  const proto = latencyRuns[0] as unknown as { protocol?: { warm?: number; n?: number } } | undefined
+  const gpuRun = latencyRuns.find((r) => r.device !== 'cpu') as unknown as { protocol?: { warm?: number; n?: number } } | undefined
+  const cpuRun = latencyRuns.find((r) => r.device === 'cpu') as unknown as { protocol?: { warm?: number; n?: number } } | undefined
   return (
     <Section
       id="speed"
       title="Speed on our machines"
       lead="Every model, on every machine we have."
-      body="The triage preset (five questions) on one short message, through the HTTP API, one request at a time: what a client sees. GPUs and CPUs of two desktop machines."
+      body="The triage preset (five questions) on a short customer message, through the HTTP API, one request at a time: what a client sees. A different message for each request, so nothing is answered from a cache."
     >
       <Figure
         title="Five questions, median request"
-        sub="log scale; further left is faster"
-        notes={`Ollaya ${latencyRuns[0]?.ollaya ?? ''}. Each model: one load, ${proto?.protocol?.warm ?? 5} untimed requests, then ${proto?.protocol?.n ?? 20} timed ones (fewer on the CPU). Linux under WSL2. A missing dot: the model did not run there (for example, it needs more memory than the GPU has) or was not measured.`}
+        sub="further left is faster; GPUs in blue, CPUs in orange, one mark per machine"
+        legend={chart.series}
+        notes={`Ollaya ${latencyRuns[0]?.ollaya ?? ''}, Linux under WSL2. Each model: one load, ${gpuRun?.protocol?.warm ?? 5} untimed requests, then ${gpuRun?.protocol?.n ?? 20} timed ones${cpuRun ? ` (on the CPU ${cpuRun.protocol?.warm ?? 2} and ${cpuRun.protocol?.n ?? 10})` : ''}. A missing dot: the model did not run there or is still being measured.`}
       >
-        <div class="mb-5">
-          <Legend series={chart.series} />
-        </div>
-        <DotPlot {...chart} />
+        <Wide>
+          <DotPlot {...chart} />
+        </Wide>
       </Figure>
     </Section>
   )
@@ -296,7 +318,7 @@ function WindowsGpus() {
   const rows = models.flatMap((m) =>
     (['cuda', 'vulkan'] as const).flatMap((d) => {
       const r = run.results.find((x) => x.model === m && x.device === d)
-      return r?.p50_ms ? [{ label: `${m}`, note: d === 'cuda' ? 'CUDA' : 'Vulkan', value: r.p50_ms, text: `${Math.round(r.p50_ms)} ms`, muted: d === 'vulkan' }] : []
+      return r?.p50_ms ? [{ label: m, note: d === 'cuda' ? 'CUDA' : 'Vulkan', value: r.p50_ms, text: `${Math.round(r.p50_ms)} ms`, tone: (d === 'cuda' ? 'gpu' : 'vulkan') as Tone }] : []
     }),
   )
   return (
@@ -304,23 +326,30 @@ function WindowsGpus() {
       id="windows"
       title="Windows: CUDA and Vulkan"
       lead="Vulkan brings GGUF models to any GPU."
-      body="Vulkan runs on NVIDIA, AMD and Intel GPUs without the 1.4 GB CUDA libraries (PR #27). On the same RTX 4090 under Windows 11, Ollaya's runtime matched llama.cpp's own server on every question with both backends; CUDA is faster."
+      body="Vulkan runs on NVIDIA, AMD and Intel GPUs without the 1.4 GB CUDA libraries (pull request #27). On the same RTX 4090 under Windows 11, Ollaya's runtime matched llama.cpp's own server on every question with both backends; CUDA is faster."
     >
-      <Figure title="Five questions, median, RTX 4090 under Windows" sub="the runtime without HTTP; lower is better">
+      <Figure
+        title="Five questions, median, RTX 4090 under Windows"
+        sub="the runtime without HTTP; lower is better"
+        legend={[
+          { label: 'CUDA', tone: 'gpu' },
+          { label: 'Vulkan', tone: 'vulkan' },
+        ]}
+      >
         <Bars label="Latency on CUDA and Vulkan" max={Math.max(...rows.map((r) => r.value))} rows={rows} />
       </Figure>
     </Section>
   )
 }
 
-const DEVICE_ORDER = ['cuda', 'vulkan', 'mlx', 'metal', 'cpu', 'coreml', 'other']
-const DEVICE_LABEL: Record<string, string> = { cuda: 'CUDA', vulkan: 'Vulkan', mlx: 'Apple GPU (MLX)', metal: 'Metal', cpu: 'CPU', coreml: 'Core ML', other: 'Other' }
+const DEVICE_ORDER = ['cuda', 'vulkan', 'mlx', 'metal', 'cpu', 'coreml']
+const DEVICE_LABEL: Record<string, string> = { cuda: 'CUDA', vulkan: 'Vulkan', mlx: 'Apple GPU (MLX)', metal: 'Metal', cpu: 'CPU', coreml: 'Core ML' }
 
 function Parity() {
   // Runtime parity of library models (tags like `kev:4b`) on the devices Ollaya runs on; export
   // checks, research checkpoints and rejected providers stay in the raw data.
   const entries: ParityResult[] = parityRuns.flatMap((r) =>
-    r.results.filter((x) => x.kind !== 'export' && x.device !== 'other' && x.pass !== null && x.pass !== undefined && /^[a-z0-9-]+:[\w.-]+$/.test(x.model)),
+    r.results.filter((x) => x.kind !== 'export' && DEVICE_ORDER.includes(x.device) && x.pass !== null && x.pass !== undefined && /^[a-z0-9-]+:[\w.-]+$/.test(x.model)),
   )
   if (!entries.length) return null
   const devices = DEVICE_ORDER.filter((d) => entries.some((e) => e.device === d))
@@ -330,7 +359,7 @@ function Parity() {
     if (!es.length) return null
     const pass = es.some((e) => e.pass === true)
     const q = Math.max(...es.map((e) => e.questions ?? e.decisions_same ?? 0))
-    return { pass, q, failOnly: es.every((e) => e.pass === false) }
+    return { pass, q }
   }
   const crossRun = parityRuns.find((r) => r.cross_device)
   const cross: CrossDevice[] = crossRun?.cross_device?.results ?? []
@@ -343,6 +372,7 @@ function Parity() {
     >
       <div class="overflow-x-auto rounded-2xl border border-line">
         <table class="w-full min-w-[32rem] text-left text-[13px] tabular-nums">
+          <caption class="sr-only">Runtime parity per model and device: passed or outside the gate, with the number of questions compared</caption>
           <thead class="border-b border-line bg-subtle text-muted">
             <tr>
               <th scope="col" class="px-4 py-2.5 font-medium">Model</th>
@@ -363,8 +393,11 @@ function Parity() {
                   const c = cell(m, d)
                   if (!c) return <td class="px-4 py-2 text-faint">·</td>
                   return (
-                    <td class={`px-4 py-2 ${c.pass ? 'text-fg' : 'text-muted'}`}>
-                      {c.pass ? '✓' : c.failOnly ? '✗' : '?'} {c.q ? <span class="text-muted">{nf.format(c.q)} q</span> : null}
+                    <td class="px-4 py-2 whitespace-nowrap">
+                      <span class="font-medium" style={`color:${toneVar(c.pass ? 'pass' : 'fail')}`}>
+                        {c.pass ? '✓ passed' : '✗ outside'}
+                      </span>
+                      {c.q ? <span class="text-muted"> {nf.format(c.q)} q</span> : null}
                     </td>
                   )
                 })}
@@ -374,7 +407,7 @@ function Parity() {
         </table>
       </div>
       <p class="mt-4 max-w-3xl text-[13px] leading-relaxed text-muted">
-        ✓ passed, with the number of questions compared; ✗ measured and outside the gate (see the notes in the raw data). Details per family:{' '}
+        The count is the number of questions compared. "Outside": measured, and over the gate on at least one question; that device does not run the model (details in the raw data). Per family:{' '}
         <a href="https://github.com/ollaya-dev/ollaya/tree/main/docs/families" class={textLink}>
           docs/families
         </a>
@@ -385,6 +418,10 @@ function Parity() {
           <Figure
             title="Same prompt, different backends"
             sub="largest difference in an option's log-probability against the RTX 4090's CUDA numbers"
+            legend={[
+              { label: 'CPU', tone: 'cpu' },
+              { label: 'Vulkan', tone: 'vulkan' },
+            ]}
             notes={crossRun?.cross_device?.note}
           >
             <Bars
@@ -392,9 +429,10 @@ function Parity() {
               max={Math.max(...cross.map((c) => c.max_logprob_diff))}
               rows={cross.map((c) => ({
                 label: c.model,
-                note: `${c.device}, ${c.decisions_same}/${c.questions} decisions the same`,
+                note: `${c.device}, ${c.decisions_same} of ${c.questions} decisions the same`,
                 value: c.max_logprob_diff,
                 text: c.max_logprob_diff.toFixed(2),
+                tone: (c.device.startsWith('cpu') ? 'cpu' : 'vulkan') as Tone,
               }))}
             />
           </Figure>
@@ -409,9 +447,9 @@ function Machines() {
     <Section id="machines" title="Machines and data" lead="Where the numbers come from.">
       <div class="grid gap-4 md:grid-cols-2">
         {Object.entries(machines).map(([id, m]) => (
-          <div class="rounded-2xl border border-line p-5">
+          <div class="rounded-xl border border-line p-5">
             <p class="text-sm font-medium text-fg">
-              {m.label} <span class="font-mono text-xs text-muted">{id}</span>
+              {m.label} <span class="font-mono text-xs font-normal text-muted">{id}</span>
             </p>
             <dl class="mt-3 grid grid-cols-[4.5rem_minmax(0,1fr)] gap-x-3 gap-y-1 text-[13px]">
               <dt class="text-muted">CPU</dt>
@@ -451,34 +489,56 @@ function Machines() {
           </>
         ))}
         . The tools are in the repository (<span class="font-mono">convert/ollaya_convert/bench_public.py</span>,{' '}
-        <span class="font-mono">bench_latency.py</span>, and the parity examples), so anyone can run them on their own hardware.
+        <span class="font-mono">bench_latency.py</span> and the parity examples), so anyone can run them on their own hardware.
       </p>
     </Section>
   )
 }
 
 export function ResultsPage() {
+  const newest = runs
+    .map((r) => r.date ?? '')
+    .filter(Boolean)
+    .sort()
+    .at(-1)
   return (
-    <div class="mx-auto max-w-6xl px-4 pt-10 pb-24 md:px-6 md:pt-16">
-      <header>
+    <>
+      <header class="mx-auto max-w-6xl px-4 pt-10 md:px-6 md:pt-16">
         <h1 class="text-4xl leading-[1.05] font-medium tracking-tight text-fg md:text-5xl">Results</h1>
         <p class="mt-5 max-w-2xl text-lg text-body">
-          What we measure on our own GPUs and CPUs: how accurate each model is, how well its confidence is calibrated,
-          how fast it runs, and whether it gives the same answers as its authors' code. All numbers, with the raw data.
+          What we measure on our own GPUs and CPUs: how accurate each model is, how well its confidence is calibrated, how fast it runs,
+          and whether it gives the same answers as its authors' code. All numbers, with the raw data.
         </p>
+        {newest ? <p class="mt-4 text-sm text-muted">Newest measurement: {newest.slice(0, 10)}</p> : null}
+        <div class="mt-10">
+          <Overview />
+        </div>
       </header>
-      <div class="mt-12">
-        <Overview />
+      <div class="mx-auto mt-20 max-w-6xl px-4 pb-24 md:mt-28 md:px-6 lg:grid lg:grid-cols-[11rem_minmax(0,1fr)] lg:gap-16">
+        <nav aria-label="Sections" class="hidden lg:block">
+          <ul class="sticky top-28 -ml-3.5 space-y-2.5 text-sm" data-scrollspy>
+            {sections.map((s) => (
+              <li>
+                <a
+                  href={`#${s.id}`}
+                  class="block border-l-2 border-transparent pl-3 text-muted hover:text-fg aria-[current=true]:border-fg aria-[current=true]:font-medium aria-[current=true]:text-fg"
+                >
+                  {s.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+        <div class="min-w-0 space-y-24 md:space-y-32">
+          <AccuracySpeed />
+          <Calibration />
+          <ByDataset />
+          <Speed />
+          <WindowsGpus />
+          <Parity />
+          <Machines />
+        </div>
       </div>
-      <div class="mt-24 space-y-24 md:space-y-32">
-        <AccuracySpeed />
-        <Calibration />
-        <ByDataset />
-        <Speed />
-        <WindowsGpus />
-        <Parity />
-        <Machines />
-      </div>
-    </div>
+    </>
   )
 }

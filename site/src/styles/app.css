@@ -39,13 +39,19 @@
   --color-tok-key: #0550ae;
   --color-tok-fn: #953800;
   --color-tok-punct: #6e7781;
-  /* Chart series (results page): one colour per device. */
-  --color-series-1: #171717;
-  --color-series-2: #2563eb;
-  --color-series-3: #d97706;
-  --color-series-4: #059669;
-  --color-series-5: #9333ea;
-  --color-series-6: #dc2626;
+  /*
+   * Data colours, taken from the terminal's syntax palette above so charts and code read as one
+   * system. Colour only ever carries data: Ollaya against another server (us, them), a GPU against
+   * a CPU, Vulkan, and a parity check passing or failing. The rest stays ink. Which machine a
+   * point belongs to is its mark (a dot or a ring), not another colour.
+   */
+  --color-us: #0969da;
+  --color-them: #bc4c00;
+  --color-gpu: #0969da;
+  --color-cpu: #bc4c00;
+  --color-vulkan: #8250df;
+  --color-pass: #1a7f37;
+  --color-fail: #cf222e;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -78,12 +84,13 @@
     --color-tok-key: #79c0ff;
     --color-tok-fn: #ffc36b;
     --color-tok-punct: #8b949e;
-    --color-series-1: #fafafa;
-    --color-series-2: #60a5fa;
-    --color-series-3: #fbbf24;
-    --color-series-4: #34d399;
-    --color-series-5: #c084fc;
-    --color-series-6: #f87171;
+    --color-us: #4493f8;
+    --color-them: #f0883e;
+    --color-gpu: #4493f8;
+    --color-cpu: #f0883e;
+    --color-vulkan: #ab7df8;
+    --color-pass: #3fb950;
+    --color-fail: #f85149;
   }
 }
 
@@ -304,8 +311,7 @@
       0 1px 0 0 rgb(255 255 255 / 0.04) inset,
       0 24px 64px -24px rgb(0 0 0 / 0.25);
   }
-  .term-bar,
-  .lat-bar {
+  .term-bar {
     background: linear-gradient(90deg, var(--color-tok-key), var(--color-tok-string));
   }
   @media (prefers-color-scheme: dark) {
