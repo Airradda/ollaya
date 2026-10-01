@@ -1,6 +1,7 @@
 import type { Child } from 'hono/jsx'
 import { Icon, type IconName } from '../components/Icon'
 import { LogoMark } from '../components/Logo'
+import { Legend } from '../components/charts'
 import { btnPrimary, Code, CodeBlock, textLink } from '../components/ui'
 import { catalog, comingNext, featuredTags, fullName } from '../data/catalog'
 import { GITHUB_URL, LOCAL_API } from '../site'
@@ -303,6 +304,14 @@ function Fast() {
           Accuracy and speed of every model{' '}
           <span class="font-normal text-muted">· typed-decisions accuracy, higher is better; latency, lower is better</span>
         </figcaption>
+        <div class="mt-4">
+          <Legend
+            items={[
+              { label: 'Ollaya', tone: 'us' },
+              { label: "TypeSafe's hosted Jev", tone: 'them' },
+            ]}
+          />
+        </div>
         <div class="mt-6 grid grid-cols-[6.5rem_minmax(0,1fr)_5.25rem] gap-x-3 sm:grid-cols-[9.5rem_minmax(0,1fr)_5.5rem] sm:gap-x-4">
           <span class="text-xs text-muted">Model</span>
           <span class="text-xs text-muted">Accuracy</span>
@@ -431,6 +440,14 @@ function VersusOllama() {
           Same GPU, same 3,880 human-labeled questions{' '}
           <span class="font-normal text-muted">· accuracy, higher is better; calibration error and latency, lower is better</span>
         </figcaption>
+        <div class="mt-4">
+          <Legend
+            items={[
+              { label: 'Ollaya 0.8.0', tone: 'us' },
+              { label: 'Ollama 0.35.0', tone: 'them' },
+            ]}
+          />
+        </div>
         <div class="mt-6">
           <div class={VS_GRID} aria-hidden="true">
             <span class="text-xs text-muted">Model</span>
