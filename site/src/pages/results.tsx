@@ -179,8 +179,8 @@ function AccuracySpeed() {
     <Section
       id="accuracy"
       title="Accuracy and speed"
-      lead="More accurate and faster than Ollama, on the same GPU."
-      body={`Bespoke Labs' public decision benchmark: ${nf.format(3880)} human-labeled questions from 13 datasets, scored with Bespoke's own code, one request at a time on one RTX 5090.`}
+      lead="Side by side with Ollama, on the same GPU."
+      body={`Ollaya is inspired by Ollama, which now serves two decision models of its own. Both ran Bespoke Labs' public decision benchmark: ${nf.format(3880)} human-labeled questions from 13 datasets, scored with Bespoke's own code, one request at a time on one RTX 5090.`}
     >
       <Figure
         title="Accuracy against latency"

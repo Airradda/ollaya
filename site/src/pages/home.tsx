@@ -7,7 +7,7 @@ import { catalog, comingNext, featuredTags, fullName } from '../data/catalog'
 import { GITHUB_URL, LOCAL_API } from '../site'
 
 const sections = [
-  { id: 'vs-ollama', label: 'Ollaya vs Ollama' },
+  { id: 'vs-ollama', label: 'Ollaya and Ollama' },
   { id: 'fast', label: 'Fast and accurate' },
   { id: 'compatible', label: 'Drop-in compatible' },
   { id: 'models', label: 'Open models' },
@@ -337,12 +337,10 @@ function Fast() {
           <span></span>
         </div>
         <p class="mt-8 max-w-2xl text-[13px] leading-relaxed text-muted">
-          Accuracy: the typed-decisions test split (400 states, 2,000 questions), argmax against the majority label,
-          measured by Ollaya for each model; Jev's from Winnow's benchmark report on the same questions.{' '}
-          <span class="font-mono">laya:typed-decisions</span> (0.766) and <span class="font-mono">jeb</span> (0.79 to 0.80) were
-          trained on this dataset's train split, so they are left out. <span class="font-mono">clm</span> caches questions and options: its latency is a new message whose
-          questions are cached. Latency: median of a five-question request through the HTTP API on an NVIDIA RTX 4090; Jev: median
-          request of the hosted API in third-party benchmarks (
+          Accuracy: the typed-decisions test split (400 states, 2,000 questions) against the majority label; Jev's from Winnow's
+          report on the same questions. <span class="font-mono">laya:typed-decisions</span> and <span class="font-mono">jeb</span>{' '}
+          were trained on this dataset, so they are left out. Latency: the median five-question request through the HTTP API on an
+          RTX 4090 (<span class="font-mono">clm</span> with its questions cached); Jev's is the hosted API in third-party benchmarks (
           <a href="https://github.com/AbdelStark/jev-benchmarks" class={textLink}>
             AbdelStark/jev-benchmarks
           </a>
@@ -350,7 +348,7 @@ function Fast() {
           <a href="https://github.com/nibzard/decision-model-benchmark" class={textLink}>
             nibzard/decision-model-benchmark
           </a>
-          ), which includes the network. Setups differ, so read the latencies as an order-of-magnitude comparison.
+          ), network included, so compare orders of magnitude.
         </p>
       </figure>
     </Section>
@@ -376,8 +374,12 @@ const vsRuns: VsRun[] = [
   { tag: 'tev1:0.8b', server: 'ollama', acc: 0.639, ece: 0.129, ms: 61 },
   { tag: 'laya:multilingual', server: 'ollaya', acc: 0.579, ece: 0.155, ms: 14 },
 ]
-const VS_ACC_SCALE = 0.8
-const vsPct = (a: number) => `${((Math.min(a, VS_ACC_SCALE) / VS_ACC_SCALE) * 100).toFixed(2)}%`
+// The accuracy axis of the comparison: a dot on a focused range, not a bar from zero, so the
+// differences between 0.58 and 0.77 are visible; the ticks print the range.
+const VS_MIN = 0.55
+const VS_MAX = 0.8
+const VS_TICKS = [0.55, 0.6, 0.65, 0.7, 0.75, 0.8]
+const vsPos = (a: number) => `${(((Math.min(Math.max(a, VS_MIN), VS_MAX) - VS_MIN) / (VS_MAX - VS_MIN)) * 100).toFixed(2)}%`
 
 const vsFeatures: { label: string; ollaya: string; ollama: string }[] = [
   { label: 'Decision models', ollaya: '15 families: encoders (laya, nli, gliclass, von) and decoders (winnow, kev, decider, nimble, jeb, jeeves, cygnet and more)', ollama: 'Nimble and Tev1, decoders only' },
@@ -391,39 +393,44 @@ const vsFeatures: { label: string; ollaya: string; ollama: string }[] = [
 ]
 
 /**
- * One comparison row. Each row is its own grid with the same columns, so the bar can drop to a line
- * of its own on a phone (model, ECE and latency on top, the full-width bar under them) and sit
- * between the model and the numbers from sm up.
+ * One comparison row. Each row is its own grid with the same columns, so the accuracy track can
+ * drop to a line of its own on a phone (model and the three numbers on top, the full-width track
+ * under them) and sit between the model and the numbers from sm up.
  */
 function VsBar({ run }: { run: VsRun }) {
   const ollama = run.server === 'ollama'
+  const num = `flex min-h-9 items-center justify-end text-[13px] whitespace-nowrap tabular-nums sm:order-none ${ollama ? 'text-body' : 'text-fg'}`
   return (
     <li class={VS_GRID}>
       <span class="order-1 flex min-h-9 flex-col justify-center leading-tight sm:order-none">
         <span class="font-mono text-xs text-fg sm:text-[13px]">{run.tag}</span>
         <span class="text-xs text-muted">{ollama ? 'on Ollama 0.35' : 'on Ollaya'}</span>
       </span>
-      <span class="relative order-4 col-span-3 flex h-6 items-center sm:order-none sm:col-span-1 sm:h-9">
-        <span class="min-w-0 flex-1">
-          <span class={`block h-2.5 min-w-1 rounded-full ${ollama ? 'bg-them' : 'bg-us'}`} style={`width:${vsPct(run.acc)}`}></span>
+      <span class="relative order-5 col-span-4 flex h-6 items-center sm:order-none sm:col-span-1 sm:h-9" aria-hidden="true">
+        <span class="relative h-px w-full bg-line">
+          <span
+            class={`absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full ${ollama ? 'border-[2.5px] border-them bg-canvas' : 'bg-us'}`}
+            style={`left:${vsPos(run.acc)}`}
+          ></span>
         </span>
-        <span class={`ml-2.5 w-11 text-[13px] whitespace-nowrap tabular-nums ${ollama ? 'text-body' : 'font-medium text-fg'}`}>{run.acc.toFixed(3)}</span>
       </span>
-      <span class={`order-2 flex min-h-9 items-center justify-end text-[13px] tabular-nums sm:order-none ${ollama ? 'text-body' : 'text-fg'}`}>{run.ece.toFixed(3)}</span>
-      <span class={`order-3 flex min-h-9 items-center justify-end text-[13px] whitespace-nowrap tabular-nums sm:order-none ${ollama ? 'text-body' : 'text-fg'}`}>{run.ms} ms</span>
+      <span class={`order-2 ${num} ${ollama ? '' : 'font-medium'}`}>{run.acc.toFixed(3)}</span>
+      <span class={`order-3 ${num}`}>{run.ece.toFixed(3)}</span>
+      <span class={`order-4 ${num}`}>{run.ms} ms</span>
     </li>
   )
 }
 
-const VS_GRID = 'grid grid-cols-[minmax(0,1fr)_3.5rem_4.5rem] gap-x-3 sm:grid-cols-[9.5rem_minmax(0,1fr)_4rem_5rem] sm:gap-x-4'
+const VS_GRID =
+  'grid grid-cols-[minmax(0,1fr)_3.25rem_3.25rem_4.25rem] gap-x-3 sm:grid-cols-[9.5rem_minmax(0,1fr)_3.75rem_3.75rem_4.75rem] sm:gap-x-4'
 
 function VersusOllama() {
   return (
     <Section
       id="vs-ollama"
-      title="Ollaya vs Ollama"
-      lead="More accurate, faster, and calibrated."
-      body="Ollama 0.35 added TypeSafe's /v1/systemone for two decision models, Nimble and Tev1. We ran both servers on the same RTX 5090 over Bespoke Labs' public benchmark: 3,880 human-labeled questions from 13 datasets, scored with Bespoke's own code."
+      title="Ollaya and Ollama"
+      lead="Inspired by Ollama, measured side by side."
+      body="Ollaya borrows Ollama's design: one binary, pull and run, a local API. Ollama 0.35 now serves two decision models too, Nimble and Tev1, so we ran both on the same RTX 5090 over Bespoke Labs' public benchmark: 3,880 human-labeled questions from 13 datasets, scored with Bespoke's own code. Ollaya leads on accuracy, calibration and the models it runs; on the same Nimble weights, Ollama is faster."
     >
       <div class="grid overflow-hidden rounded-2xl border border-line sm:grid-cols-3">
         <Stat value="0.773" unit="" label="Most accurate: winnow:12b on Ollaya" detail="Ollama's best: 0.749 (Nimble)" />
@@ -444,7 +451,7 @@ function VersusOllama() {
           <Legend
             items={[
               { label: 'Ollaya 0.8.0', tone: 'us' },
-              { label: 'Ollama 0.35.0', tone: 'them' },
+              { label: 'Ollama 0.35.0', tone: 'them', mark: 'ring' },
             ]}
           />
         </div>
@@ -452,6 +459,9 @@ function VersusOllama() {
           <div class={VS_GRID} aria-hidden="true">
             <span class="text-xs text-muted">Model</span>
             <span class="hidden text-xs text-muted sm:block">Accuracy</span>
+            <span class="text-right text-xs text-muted">
+              <span class="sm:hidden">Acc.</span>
+            </span>
             <span class="text-right text-xs text-muted">ECE</span>
             <span class="text-right text-xs text-muted">Latency</span>
           </div>
@@ -460,6 +470,19 @@ function VersusOllama() {
               <VsBar run={r} />
             ))}
           </ul>
+          <div class={VS_GRID} aria-hidden="true">
+            <span class="hidden sm:block"></span>
+            <span class="relative col-span-4 mt-2 h-5 border-t border-line text-[11px] text-muted tabular-nums sm:col-span-1">
+              {VS_TICKS.map((t, i) => (
+                <span
+                  class={`absolute top-1.5 ${i === 0 ? '' : i === VS_TICKS.length - 1 ? '-translate-x-full' : '-translate-x-1/2'}`}
+                  style={`left:${vsPos(t)}`}
+                >
+                  {t.toFixed(2)}
+                </span>
+              ))}
+            </span>
+          </div>
         </div>
       </figure>
 
@@ -492,19 +515,15 @@ function VersusOllama() {
         </table>
       </div>
       <p class="mt-8 max-w-2xl text-[13px] leading-relaxed text-muted">
-        Bespoke Labs' public benchmark (<a href="https://github.com/bespokelabsai/nimble/blob/main/docs/PUBLIC_BENCHMARKS.md" class={textLink}>docs/PUBLIC_BENCHMARKS.md</a>),
-        13 subsets rebuilt byte for byte from their manifests and scored with their runner
-        (<span class="font-mono">convert/ollaya_convert/bench_public.py</span>), one request at a time on one RTX 5090 with
-        Ollaya 0.8.0 and Ollama 0.35.0. Accuracy: the mean over the 13 subsets. ECE: ten-bin calibration error of the top
-        probability over all 3,880 questions. Latency: median request (one question), HTTP included. A rejected request
-        counts as a wrong answer. On the same Nimble weights Ollama is faster (it runs Q8_0 on llama.cpp; Ollaya computes in
-        fp32 and repeats the request for each question), and Ollaya is calibrated: it applies the author's temperature,
-        Ollama returns the raw softmax. Jeb, Jeeves and Cygnet joined after this run. Every model, machine and dataset, with
-        the raw data:{' '}
-        <a href="/results" class={textLink}>
-          results
+        <a href="https://github.com/bespokelabsai/nimble/blob/main/docs/PUBLIC_BENCHMARKS.md" class={textLink}>Bespoke Labs' public benchmark</a>,
+        one request at a time with Ollaya 0.8.0 and Ollama 0.35.0. Accuracy is the mean over the 13 datasets; ECE is the
+        calibration error of the top probability; latency is the median request, HTTP included. Ollama runs Nimble as Q8_0 on
+        llama.cpp, Ollaya in fp32 with the author's temperature.
+      </p>
+      <p class="mt-4">
+        <a href="/results" class="inline-flex items-center gap-1.5 text-sm font-medium text-fg underline-offset-4 hover:underline">
+          All results, every machine, with the raw data <Icon name="arrowRight" class="size-4" />
         </a>
-        .
       </p>
     </Section>
   )
