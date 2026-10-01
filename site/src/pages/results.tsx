@@ -162,7 +162,8 @@ export function speedDots() {
   return {
     rows,
     series: dots,
-    ticks: [5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000],
+    // Up to 100 s: nimble:9b on a CPU takes about a minute; the scale clamps anything past its end.
+    ticks: [5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000],
     label: 'Median latency of five-question requests per model, on each GPU and CPU we measured',
   }
 }

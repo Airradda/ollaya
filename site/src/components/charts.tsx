@@ -410,7 +410,7 @@ export function DotPlot({
   const W = compact ? 400 : 760
   const rowH = compact ? 22 : 24
   const m = { l: compact ? 122 : 150, r: compact ? 10 : 16, t: standalone ? 34 : 8, b: 34 }
-  const shown = compact ? ticks.filter((t) => [5, 10, 100, 1000, 10000].includes(t)) : ticks
+  const shown = compact ? ticks.filter((t) => [10, 100, 1000, 10000, 100000].includes(t)) : ticks
   const H = m.t + rows.length * rowH + m.b
   const x = logScale(ticks[0]!, ticks.at(-1)!, m.l, W - m.r)
   const sa = standaloneParts(W, H, standalone)
