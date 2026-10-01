@@ -186,7 +186,7 @@ export async function renderSite({ origin, assetVersions, stars }: BuildOptions)
   // Two charts as their own .svg files, for the README (light and dark through prefers-color-scheme).
   out.push({ path: 'data/results/accuracy-speed.svg', body: `${await toSvg(<Scatter {...accuracyScatter()} standalone />)}\n` })
   const speed = speedDots()
-  if (speed.rows.length) out.push({ path: 'data/results/speed.svg', body: `${await toSvg(<DotPlot {...speed} standalone legend />)}\n` })
+  if (speed.rows.length) out.push({ path: 'data/results/speed.svg', body: `${await toSvg(<DotPlot {...speed} standalone />)}\n` })
 
   const seen = new Set<string>()
   for (const f of out) {
