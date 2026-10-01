@@ -12,6 +12,7 @@
 <p align="center">
   <a href="https://ollaya.dev">Website</a> ·
   <a href="https://ollaya.dev/search">Models</a> ·
+  <a href="https://ollaya.dev/results">Results</a> ·
   <a href="https://ollaya.dev/docs">Docs</a> ·
   <a href="https://github.com/ollaya-dev/ollaya/releases">Releases</a> ·
   <a href="https://huggingface.co/ollaya-dev">Hugging Face</a>
@@ -108,6 +109,31 @@ Browse them at [ollaya.dev/search](https://ollaya.dev/search). Laya tags ending 
 Ollama 0.35 also serves decision models: Nimble and Tev1, through the same TypeSafe wire format.
 [The FAQ](https://ollaya.dev/docs/faq#ollama-runs-decision-models-now-how-is-ollaya-different)
 compares the two projects.
+
+## Results
+
+We measure every model on our own GPUs and CPUs and publish all of it, with the raw data, at
+[ollaya.dev/results](https://ollaya.dev/results): accuracy and calibration on public benchmarks,
+speed on every machine, and parity with the authors' own code on each device.
+
+<p align="center">
+  <a href="https://ollaya.dev/results"><img src="https://ollaya.dev/data/results/accuracy-speed.svg" alt="Accuracy against latency on Bespoke Labs' public benchmark, RTX 5090: Ollaya's models and Ollama's" width="760"></a>
+</p>
+
+- **Accuracy.** On Bespoke Labs' public benchmark (3,880 human-labeled questions from 13 datasets,
+  scored with Bespoke's own code, one RTX 5090), `winnow:12b` scores 0.773 at 60 ms per question.
+  Ollama's best, Nimble, scores 0.749 at 210 ms.
+- **Calibration.** On the same Nimble weights, the calibration error is 0.022 on Ollaya and 0.122
+  on Ollama: Ollaya applies each model's fitted temperature.
+- **Speed.** Every model on an RTX 5090 and an RTX 4090, five questions per request through the
+  HTTP API: 7 to 35 ms for the encoders (`laya`, `nli`, `gliclass`, `von`, `qwen3guard`), 0.1 to
+  0.7 s for the decoders, and 1.8 s for `nimble:9b`. The CPU numbers follow on the results page.
+- **Parity.** Before a model ships, its runtime is checked question by question against the
+  authors' code (or llama.cpp's own server, for GGUF models) on each device it runs on.
+
+<p align="center">
+  <a href="https://ollaya.dev/results#speed"><img src="https://ollaya.dev/data/results/speed.svg" alt="Median latency of five-question requests for every model on each GPU and CPU we measured" width="760"></a>
+</p>
 
 ## Install
 

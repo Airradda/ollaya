@@ -39,6 +39,13 @@
   --color-tok-key: #0550ae;
   --color-tok-fn: #953800;
   --color-tok-punct: #6e7781;
+  /* Chart series (results page): one colour per device. */
+  --color-series-1: #171717;
+  --color-series-2: #2563eb;
+  --color-series-3: #d97706;
+  --color-series-4: #059669;
+  --color-series-5: #9333ea;
+  --color-series-6: #dc2626;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -71,6 +78,12 @@
     --color-tok-key: #79c0ff;
     --color-tok-fn: #ffc36b;
     --color-tok-punct: #8b949e;
+    --color-series-1: #fafafa;
+    --color-series-2: #60a5fa;
+    --color-series-3: #fbbf24;
+    --color-series-4: #34d399;
+    --color-series-5: #c084fc;
+    --color-series-6: #f87171;
   }
 }
 
