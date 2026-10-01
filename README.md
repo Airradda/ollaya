@@ -178,6 +178,10 @@ cargo test --workspace
 cargo build --release -p ollaya --features cuda   # CUDA build (x86-64 Linux and Windows)
 ```
 
+Run the CLI directly with `nix run .#`, or run `nix develop` to enter the pinned development
+environment. The shell includes stable Rust, Node.js 24, `uv`, ShellCheck, and the native libraries
+needed to build the Linux desktop app.
+
 `convert/` rebuilds models. It exports them, checks parity against the PyTorch reference,
 generates golden fixtures, and packages the result into `registry/`. See the module docstrings.
 `cd convert && uv sync` installs it: with CUDA 13 torch on Linux and Windows, and with the CPU and
