@@ -109,8 +109,10 @@ Not run: the CPU and Metal.
   ECE **0.020** with no temperature at all. Cloudflare's card does not list the training data; it reports
   results on TypeSafe's workflow evals (invoices, customer service, security incidents, agent traces), the kinds
   of workflows typed-decisions covers.
-- **RTX 4090, in the runner:** a five-question request takes 581 ms at the median (p95 792 ms); the 400
-  typed-decisions requests took 284 s.
+- **RTX 4090, HTTP API** (Ollaya 0.9.0, `clef` pulled from the registry): the triage preset (five questions)
+  takes 532 ms at the median of 15 warm requests on one message, and 525 ms over 20 different messages
+  (`results/runs/2026-10-02-latency-rtx4090-cuda-extra.json`). In the runner, on the parity fixtures: 581 ms
+  (p95 792 ms); the 400 typed-decisions requests took 284 s.
 - **Memory.** The weights take about 18 GB kept BF16, so a 24 GB GPU. On the RTX 4090, requests of mixed length up
   to the 4,096-token limit ran back to back at a peak of 22.8 GB (a 4,096-token request in about 3.0 s). At 6,000
   and 8,000 tokens the GPU ran out of memory and the driver spilled into host memory, so a request took minutes;

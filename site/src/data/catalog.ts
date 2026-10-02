@@ -223,7 +223,7 @@ const overlays: Record<string, ModelOverlay> = {
     },
   },
   clef: {
-    stats: { tag: 'clef:flash', accuracy: 0.703 },
+    stats: { tag: 'clef:flash', accuracy: 0.703, latencyMs: 532 },
     title: 'Clef',
     description:
       "Decision models by Cloudflare. Clef-Flash is Qwen3.5-9B, fully post-trained, with a joint schema head that scores every option of every question together, in one forward pass per request. Its probabilities come straight from the head. Ollaya runs its text path.",

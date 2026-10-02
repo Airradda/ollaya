@@ -6,9 +6,9 @@ Clef is Cloudflare's family of decision models, released under Apache-2.0. Clef-
 
 | Tag | Base | Params | Typed-decisions accuracy | Five questions, RTX 4090 |
 |---|---|---|---|---|
-| `clef:latest`, `clef:flash` | Qwen3.5-9B, post-trained | 9B | 0.703 | 0.58 s in the runner |
+| `clef:latest`, `clef:flash` | Qwen3.5-9B, post-trained | 9B | 0.703 | 532 ms |
 
-Typed-decisions accuracy is the argmax against the majority label on all 400 typed-decisions states, measured by Ollaya, with a calibration error (ECE) of 0.020 and no fitted temperature. Cloudflare reports Clef-Flash's results on their Decision Index on the [model card](https://huggingface.co/Cloudflare/clef-flash).
+Typed-decisions accuracy is the argmax against the majority label on all 400 typed-decisions states, measured by Ollaya, with a calibration error (ECE) of 0.020 and no fitted temperature. The time is the median of 15 warm requests of the triage preset through the HTTP API. Cloudflare reports Clef-Flash's results on their Decision Index on the [model card](https://huggingface.co/Cloudflare/clef-flash).
 
 The larger Clef (Qwen3.8-27B, about 54 GB in BF16) is not in the library yet: it does not fit the GPUs Ollaya checks parity on.
 

@@ -102,7 +102,7 @@ numbers: [ollaya.dev/search](https://ollaya.dev/search).
 | `nimble` | Bespoke Labs' Nimble v2: a LoRA on Qwen3.5-9B that reads the whole request as a JSON schema and scores option codes, with the author's temperature: 0.665 on typed-decisions, up to 255 options, ~2.3 s for five questions on an RTX 4090 |
 | `jeb`, `jeb:4b`, `jeb:27b` | Jason Brashear's Jebadiah (AINode): LoRAs merged into Qwen3.5 (9B by default, 4B) and Qwen3.8-27B, run from the authors' GGUF on llama.cpp with their per-type temperatures; `jeb:9b` answers five questions in 124 ms on an RTX 4090 |
 | `jeeves` | PostHog's Jeeves-9B without its reasoning chain: Qwen3.5-9B (LoRA merged) and a pointer head: 0.680 on typed-decisions with an ECE of 0.031, 838 ms for five questions on an RTX 4090 |
-| `clef` | Cloudflare's Clef-Flash: Qwen3.5-9B, fully post-trained, with a joint schema head that scores every question's options in one forward pass: 0.703 on typed-decisions with an ECE of 0.020 and no fitted temperature |
+| `clef` | Cloudflare's Clef-Flash: Qwen3.5-9B, fully post-trained, with a joint schema head that scores every question's options in one forward pass: 0.703 on typed-decisions with an ECE of 0.020 and no fitted temperature, 532 ms for five questions on an RTX 4090 |
 | `cygnet` | blockbrain-ai's Cygnet: frozen Gemma 4 12B IT (Q8_0 GGUF) with a letter-readout prompt and temperature 3.4: 0.683 on typed-decisions, 202 ms for five questions on an RTX 4090 |
 
 Browse them at [ollaya.dev/search](https://ollaya.dev/search). Laya tags ending in

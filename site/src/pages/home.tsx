@@ -226,6 +226,7 @@ function Section({
 const scoreboard: { tag: string; acc: number; ms: number; pick?: boolean; note?: string }[] = [
   { tag: 'winnow:e4b', acc: 0.722, ms: 89, pick: true },
   { tag: 'kev:9b', acc: 0.722, ms: 498 },
+  { tag: 'clef:flash', acc: 0.703, ms: 532 },
   { tag: 'winnow:12b', acc: 0.702, ms: 131 },
   { tag: 'cygnet:12b', acc: 0.683, ms: 202 },
   { tag: 'decider:4b', acc: 0.68, ms: 520 },
