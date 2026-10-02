@@ -30,7 +30,8 @@ mod fake_runner {
     use axum::routing::{get, post};
     use serde_json::{Value, json};
 
-    /// `runner --decision <file> ...`: behaviour comes from the decision layer's `fake` object.
+    /// `runner --decision <file> ... --device <device>`: behaviour comes from the decision
+    /// layer's `fake` object.
     pub fn main(args: &[String]) {
         let arg = |name: &str| {
             args.iter()
@@ -41,15 +42,22 @@ mod fake_runner {
         let decision: Value =
             serde_json::from_str(&std::fs::read_to_string(arg("--decision").unwrap()).unwrap())
                 .unwrap();
+        let device = arg("--device").unwrap_or_else(|| "cpu".into());
         let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(serve(Arc::new(decision)));
+        rt.block_on(serve(Arc::new(decision), device));
     }
 
-    async fn serve(decision: Arc<Value>) {
+    async fn serve(decision: Arc<Value>, device: String) {
         let fake = &decision["fake"];
         if fake["fail_load"].as_bool() == Some(true) {
             eprintln!("fake runner: cannot load this model");
             std::process::exit(1);
+        }
+        // A GPU backend that takes the process down while it loads (a driver fault, an abort in
+        // ggml), before the runner can fall back to the CPU itself.
+        if fake["abort_unless_cpu"].as_bool() == Some(true) && device != "cpu" {
+            eprintln!("fake runner: the GPU backend aborted");
+            std::process::exit(134);
         }
         // Log more than any pipe buffer holds before announcing, as a verbose runner does.
         for i in 0..fake["stderr_lines"].as_u64().unwrap_or(0) {
@@ -61,9 +69,14 @@ mod fake_runner {
         .await;
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = listener.local_addr().unwrap().port();
+        let device = if device == "auto" {
+            "cpu".into()
+        } else {
+            device
+        };
         println!(
             "{}",
-            json!({"port": port, "device": "cpu", "precision": "fp32"})
+            json!({"port": port, "device": device, "precision": "fp32"})
         );
         let d = decision.clone();
         let app = axum::Router::new()
@@ -200,6 +213,32 @@ fn add_model(store: &Store, name: &str, languages: &[&str], fake: Value) {
         .unwrap();
 }
 
+/// A GGUF model, which runs on llama.cpp: the GGUF file and its decision layer.
+fn add_gguf_model(store: &Store, name: &str, fake: Value) {
+    let config = json!({"model_format": "gguf", "family": "winnow", "layout": "winnow-v1",
+        "parameter_size": "4B", "description": format!("{name} for tests"), "license": "Apache-2.0"});
+    let decision =
+        json!({"engine": "llama", "family": "winnow", "layout": "winnow-v1", "fake": fake});
+    let manifest = Manifest {
+        schema_version: 2,
+        media_type: MANIFEST_V2.into(),
+        config: blob(store, media::CONFIG, config.to_string().as_bytes(), None),
+        layers: vec![
+            blob(store, media::GGUF, format!("{name} gguf").as_bytes(), None),
+            blob(
+                store,
+                media::DECISION,
+                decision.to_string().as_bytes(),
+                None,
+            ),
+        ],
+    };
+    let name = ModelName::parse(name).unwrap();
+    store
+        .write_manifest(&name, &serde_json::to_vec(&manifest).unwrap())
+        .unwrap();
+}
+
 fn add_router(store: &Store) {
     let config = json!({"model_format": "router", "family": "laya", "languages": ["en", "multilingual"],
         "description": "laya router"});
@@ -251,7 +290,8 @@ impl Daemon {
             exe: std::env::current_exe().unwrap(),
             arg0: None,
             env: vec![],
-            llama_dir: None,
+            // The fake runner needs no llama.cpp; GGUF models need the directory to be set.
+            llama_dir: Some(dir.path().join("llama")),
             cpu_exe: None,
         };
         let state = build(config.clone(), runner).unwrap();
@@ -1237,6 +1277,34 @@ async fn presets_create_show_decide_delete() {
     d.stop().await;
 }
 
+async fn gguf_runner_that_dies_on_the_gpu_restarts_on_the_cpu() {
+    let d = Daemon::start(
+        |dir| {
+            let store = Store::open(dir).unwrap();
+            add_gguf_model(&store, "fragile:latest", json!({"abort_unless_cpu": true}));
+            add_gguf_model(&store, "broken:latest", json!({"fail_load": true}));
+        },
+        |c| {
+            c.device = "auto".into();
+            c.load_timeout = Duration::from_secs(30);
+        },
+    )
+    .await;
+    d.client.load("fragile", None).await.unwrap();
+    let ps = d.client.ps().await.unwrap();
+    let devices: Vec<(&str, &str)> = ps
+        .models
+        .iter()
+        .map(|m| (m.name.as_str(), m.device.as_str()))
+        .collect();
+    assert_eq!(devices, [("fragile:latest", "cpu")]);
+    // A model that fails everywhere still reports its error.
+    let (status, body) = api_err(d.client.load("broken", None).await.unwrap_err());
+    assert_eq!(status, 500, "{body:?}");
+    assert!(body.error.contains("cannot load this model"), "{body:?}");
+    d.stop().await;
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.get(1).map(String::as_str) == Some("runner") {
@@ -1258,6 +1326,7 @@ fn main() {
         queue_bound_and_cancellation,
         pull_streams_ndjson,
         create_copy_delete,
+        gguf_runner_that_dies_on_the_gpu_restarts_on_the_cpu,
         presets_create_show_decide_delete,
     ];
     let rt = tokio::runtime::Runtime::new().unwrap();
