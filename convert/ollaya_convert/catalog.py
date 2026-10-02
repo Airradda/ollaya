@@ -445,6 +445,34 @@ CATALOG = {
                   "same 16 rejected requests, the same decision on every question, scores within 1.9e-4 and "
                   "probabilities within 1.4e-5.",
     },
+    "clef": {
+        "namespace": "library",
+        "model": "clef",
+        "family": "clef",
+        "author": "Cloudflare (post-trained model and joint schema head) and the Qwen team (base model)",
+        "license": "Apache-2.0",
+        "license_text": ("Clef-Flash by Cloudflare (https://huggingface.co/Cloudflare/clef-flash): Qwen3.5-9B, fully "
+                         "post-trained, with a joint schema head, Apache-2.0.\n"
+                         "Base model: Qwen3.5-9B by the Qwen team, Apache-2.0.\n"
+                         "Licensed under the Apache License, Version 2.0.\n\n") + LICENSE_APACHE,
+        "tags": {
+            # Text only: the vision tower (in the last shard) is not exported. Clef (27B) does not fit the GPUs
+            # the parity gate runs on, so only Clef-Flash is converted.
+            "flash": dict(_wl("clef-flash", "Cloudflare/clef-flash", "17f0b0ad64efb65d273590632833508766b2aae6",
+                              "Cloudflare's Clef-Flash: Qwen3.5-9B post-trained with a joint schema head that scores "
+                              "every option of every question together, in one forward pass per request. Needs about "
+                              "19 GB of memory.",
+                              "9B", 4096, ["en"], wl_dir=os.path.join(OUT, "clef-flash"),
+                              weights={**{"model-%05d-of-00004.safetensors" % i: "model-%05d-of-00004.safetensors" % i
+                                          for i in range(1, 5)},
+                                       "joint_head.safetensors": "joint_head.safetensors"})),
+        },
+        "aliases": {"latest": "flash"},
+        "parity": "Ollaya's Rust runtime matches the authors' own code (joint_schema_model.py: their encoder, Qwen3.5 "
+                  "model and joint schema head, fp32) on 571 questions from 131 requests, on CUDA: identical token ids "
+                  "and spans, the same 13 rejected requests, the same decision on every question, logits within "
+                  "4.3e-5 and probabilities within 6.3e-6.",
+    },
     "jeb": {
         "namespace": "library",
         "model": "jeb",

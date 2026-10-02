@@ -222,6 +222,20 @@ const overlays: Record<string, ModelOverlay> = {
       '9b': { summary: 'Jeeves-9B without thinking, with the fitted temperature 1.86. Needs a 24 GB GPU.' },
     },
   },
+  clef: {
+    stats: { tag: 'clef:flash', accuracy: 0.703 },
+    title: 'Clef',
+    description:
+      "Decision models by Cloudflare. Clef-Flash is Qwen3.5-9B, fully post-trained, with a joint schema head that scores every option of every question together, in one forward pass per request. Its probabilities come straight from the head. Ollaya runs its text path.",
+    publisher: { name: 'Cloudflare', url: 'https://huggingface.co/Cloudflare' },
+    capabilities: ['decision', 'fine-tuned'],
+    keywords: ['clef', 'clef-flash', 'cloudflare', 'qwen', 'qwen3.5', 'joint schema', 'llm', 'decision', 'classification', 'typesafe', 'jev', 'system one'],
+    rank: 16,
+    tags: {
+      latest: { summary: 'Same as clef:flash.' },
+      flash: { summary: 'Clef-Flash (Qwen3.5-9B, post-trained) with its joint schema head, text only. Needs a 24 GB GPU.' },
+    },
+  },
   jeb: {
     stats: { tag: 'jeb:9b', latencyMs: 124 },
     title: 'Jebadiah',

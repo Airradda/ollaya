@@ -7,6 +7,7 @@
 
 pub mod answer;
 pub mod calibration;
+pub mod clef;
 pub mod clm;
 pub mod cygnet;
 pub mod decider;
